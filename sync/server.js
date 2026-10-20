@@ -9,9 +9,9 @@ const path = require('path');
 const PORT = Number(process.env.PORT || 8787);
 const TOKEN = process.env.SYNC_TOKEN || '';
 const DATA = process.env.SYNC_DATA || path.join(__dirname, 'sync-data.json');
-const DOCS = ['qa', 'candidates', 'todos'];
+const DOCS = ['qa', 'candidates', 'todos', 'products'];
 
-let db = { seats: {}, docs: { qa: [], candidates: [], todos: [] } };
+let db = { seats: {}, docs: { qa: [], candidates: [], todos: [], products: [] } };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(DATA, 'utf8')) }; } catch {}
 let dirty = false;
 setInterval(() => { if (dirty) { fs.writeFileSync(DATA, JSON.stringify(db)); dirty = false; } }, 2000);

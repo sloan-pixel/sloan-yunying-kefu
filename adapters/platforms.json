@@ -65,11 +65,25 @@
       "input": "#reply-input",
       "sendBtn": "#send-btn",
       "transferSteps": [
-        { "click": "#transfer-btn" },
-        { "type": "#transfer-search", "text": "{target}" },
-        { "clickText": ".agent-item", "text": "{target}" },
-        { "click": "#transfer-confirm" }
-      ]
+        {
+          "click": "#transfer-btn"
+        },
+        {
+          "type": "#transfer-search",
+          "text": "{target}"
+        },
+        {
+          "clickText": ".agent-item",
+          "text": "{target}"
+        },
+        {
+          "click": "#transfer-confirm"
+        }
+      ],
+      "orderItem": ".order-card",
+      "orderSend": ".order-card .order-send",
+      "goodsItem": ".goods-card",
+      "goodsSend": ".goods-card .goods-send"
     }
   }
 }

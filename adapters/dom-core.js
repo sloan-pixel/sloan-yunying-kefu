@@ -7,6 +7,23 @@
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const textOf = el => (el ? (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim() : '');
+  // 按行取文字（订单卡片、商品卡片用）：去掉空行和按钮文字
+  // 卡片里的文字拆成一行行，去掉按钮上的字
+  const linesOf = (el, skip) => {
+    if (!el) return [];
+    const sk = (skip || []).filter(Boolean);
+    // 优先按文字节点拆（标签和值通常是两个节点，方便显示成「订单号：xxx」），节点太碎时再按显示的行拆
+    let lines = [];
+    {
+      const w = el.ownerDocument.createTreeWalker(el, 4);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const p = n.parentElement; if (p && (p.closest('button,script,style') && el.contains(p.closest('button,script,style')))) continue;
+        const t = n.nodeValue.trim(); if (t) lines.push(t);
+      }
+      if (lines.length > 40 || lines.some(x => x.length === 1 && /[¥￥$:：]/.test(x))) lines = String(el.innerText || el.textContent || '').split(/\n+/).map(x => x.trim()).filter(Boolean);
+    }
+    return lines.map(x => sk.reduce((a, b) => (a === b ? '' : a.endsWith(b) ? a.slice(0, -b.length).trim() : a), x)).filter(Boolean);
+  };
 
   function q(doc, sel, base) { if (!sel) return null; try { return (base || doc).querySelector(sel); } catch { return null; } }
   function qa(doc, sel, base) { if (!sel) return []; try { return [...(base || doc).querySelectorAll(sel)]; } catch { return []; } }
@@ -182,6 +199,43 @@
       } finally { busy = false; }
     }
 
+    // ---------- 订单栏 / 商品栏 ----------
+    // 卡片 = 一条订单或一个商品；发送按钮 = 卡片里平台自带的「发送」按钮
+    function cards(itemSel, sendSel) {
+      return qa(doc, itemSel).map((card, idx) => {
+        const btn = q(doc, sendSel, card);
+        return { idx, lines: linesOf(card, btn ? [textOf(btn)] : []), canSend: !!btn };
+      });
+    }
+    function readCards(kind, convId) { return kind === 'orders' && convId ? enqueue(() => doReadCards(kind, convId)) : doReadCards(kind); }
+    async function doReadCards(kind, convId) {
+      if (kind === 'orders' && convId) { if (!(await openConv(convId))) throw new Error('找不到会话：' + convId); await sleep(300); }
+      if (kind === 'orders') { if (!cfg.orderItem) throw new Error('还没校准「订单卡片」'); return cards(cfg.orderItem, cfg.orderSend); }
+      if (!cfg.goodsItem) throw new Error('还没校准「商品卡片」');
+      return cards(cfg.goodsItem, cfg.goodsSend);
+    }
+    function clickCard(kind, convId, idx, matchText) {
+      return enqueue(async () => {
+        busy = true;
+        try {
+          if (convId && !(await openConv(convId))) throw new Error('找不到会话：' + convId);
+          await sleep(200);
+          const itemSel = kind === 'orders' ? cfg.orderItem : cfg.goodsItem, sendSel = kind === 'orders' ? cfg.orderSend : cfg.goodsSend;
+          if (!itemSel || !sendSel) throw new Error(kind === 'orders' ? '还没校准订单卡片或发送按钮' : '还没校准商品卡片或发送按钮');
+          const list = qa(doc, itemSel);
+          // 优先按文字找（卡片顺序可能变），找不到再按序号
+          const card = (matchText && list.find(c => textOf(c).includes(matchText))) || list[idx];
+          if (!card) throw new Error('页面上找不到这张卡片，可能已刷新，请点「刷新」');
+          const btn = q(doc, sendSel, card);
+          if (!btn) throw new Error('这张卡片上没有发送按钮');
+          btn.click();
+          await sleep(300);
+          scanCurrent(false);
+          return true;
+        } finally { busy = false; }
+      });
+    }
+
     function tick() { try { scanCurrent(false); if (!busy) openUnread(); } catch (e) { log(e); } }
     function start() {
       stop();
@@ -192,9 +246,10 @@
     }
     function stop() { observer && observer.disconnect(); clearInterval(timer); }
     function health() {
-      return { input: !!q(doc, cfg.input), convList: qa(doc, cfg.convList).length, msgItem: msgNodes().length, currentConv: convIdNow(), sendBtn: !!q(doc, cfg.sendBtn) };
+      return { input: !!q(doc, cfg.input), convList: qa(doc, cfg.convList).length, msgItem: msgNodes().length, currentConv: convIdNow(), sendBtn: !!q(doc, cfg.sendBtn),
+        orders: cfg.orderItem ? qa(doc, cfg.orderItem).length : null, goods: cfg.goodsItem ? qa(doc, cfg.goodsItem).length : null };
     }
-    return { start, stop, send, transfer, health, scanCurrent, setAutoOpen: v => { autoOpen = v; }, openConv };
+    return { start, stop, send, transfer, health, scanCurrent, setAutoOpen: v => { autoOpen = v; }, openConv, readCards, clickCard };
   }
 
   // ---------- 校准：鼠标悬停高亮，点击生成选择器 ----------
@@ -233,16 +288,44 @@
     box.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border:2px solid #ff5a1f;background:rgba(255,90,31,.12);border-radius:3px;transition:all .05s';
     const tip = doc.createElement('div');
     tip.style.cssText = 'position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);background:#1d1d1f;color:#fff;font:13px/1.4 sans-serif;padding:8px 14px;border-radius:6px;pointer-events:none';
-    tip.textContent = `校准：请点击「${label}」${list ? '（任意一个即可，会自动匹配同类）' : ''}　按 Esc 取消`;
+    tip.textContent = `校准：请点击「${label}」${list ? '（任意一个即可，会自动匹配同类）' : ''}　框太小按 ↑ 扩大，↓ 缩小，Esc 取消`;
     doc.body.append(box, tip);
-    let target = null;
-    const move = e => { target = e.target; const r = target.getBoundingClientRect(); Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }); };
-    const click = e => { e.preventDefault(); e.stopPropagation(); cleanup(); target = target || e.target; const sel = selectorFor(target, doc, list); onPick && onPick({ selector: sel, count: qa(doc, sel).length, sample: textOf(target).slice(0, 40) }); };
-    const key = e => { if (e.key === 'Escape') { cleanup(); onCancel && onCancel(); } };
-    function cleanup() { doc.removeEventListener('mousemove', move, true); doc.removeEventListener('click', click, true); doc.removeEventListener('keydown', key, true); box.remove(); tip.remove(); }
-    doc.addEventListener('mousemove', move, true); doc.addEventListener('click', click, true); doc.addEventListener('keydown', key, true);
+    let target = null, hovered = null, up = 0;
+    const win = doc.defaultView;
+    // ↑ 键：框往外扩一层（选中父元素），↓ 键：缩回
+    const lift = el => { let t = el; for (let i = 0; i < up && t.parentElement && t.parentElement !== doc.body; i++) t = t.parentElement; return t; };
+    const draw = () => { if (!hovered) return; target = lift(hovered); const r = target.getBoundingClientRect(); Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }); };
+    const move = e => { if (e.target !== hovered) { hovered = e.target; up = 0; } draw(); };
+    // 点选期间把点击完全拦下（在 window 捕获阶段，最早一层），平台页面收不到这次点击：
+    // 点「发送订单」等按钮做校准时，不会真的发出去
+    const block = e => { e.preventDefault(); e.stopImmediatePropagation(); };
+    const click = e => { block(e); cleanup(); target = target || lift(e.target); const sel = selectorFor(target, doc, list); onPick && onPick({ selector: sel, count: qa(doc, sel).length, sample: textOf(target).slice(0, 40) }); };
+    const key = e => {
+      if (e.key === 'Escape') { block(e); cleanup(); onCancel && onCancel(); }
+      else if (e.key === 'ArrowUp') { block(e); up++; draw(); }
+      else if (e.key === 'ArrowDown') { block(e); up = Math.max(0, up - 1); draw(); }
+    };
+    const BLOCKED = ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'dblclick', 'contextmenu', 'auxclick'];
+    function cleanup() {
+      win.removeEventListener('mousemove', move, true); win.removeEventListener('click', click, true); win.removeEventListener('keydown', key, true);
+      // 稍后再放开按下/抬起事件，防止抬起事件晚到触发平台的点击
+      setTimeout(() => BLOCKED.forEach(t => win.removeEventListener(t, block, true)), 50);
+      box.remove(); tip.remove();
+    }
+    win.addEventListener('mousemove', move, true); win.addEventListener('click', click, true); win.addEventListener('keydown', key, true);
+    BLOCKED.forEach(t => win.addEventListener(t, block, true));
     return cleanup;
   }
 
-  return { createWatcher, startPicker, selectorFor };
+  // 校准检查：每个选择器在当前页面上找到几个
+  function countSelectors(doc, selectors) {
+    const out = {}, samples = {}; let total = 0;
+    for (const [k, v] of Object.entries(selectors || {})) {
+      if (typeof v !== 'string' || !v) continue;
+      const els = qa(doc, v); out[k] = els.length; total += els.length;
+      if (els.length) samples[k] = textOf(els[0]).slice(0, 40) || (els[0].tagName === 'TEXTAREA' || els[0].tagName === 'INPUT' ? '（输入框）' : '（无文字）');
+    }
+    return { counts: out, samples, total };
+  }
+  return { createWatcher, startPicker, selectorFor, countSelectors };
 });

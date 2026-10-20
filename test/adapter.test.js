@@ -88,6 +88,26 @@ const cfg = require('../adapters/platforms.json').mock.selectors;
   await page.waitForTimeout(1500);
   const a9 = await page.evaluate(() => window.__ev.filter(e => e.type === 'buyer').length);
   check(a9 === b9, `列表顶部被裁掉后不重复上报（之前 ${b9}，之后 ${a9}）`);
+  // 10) 订单栏 / 商品栏：读取、一键发送
+  const orders = await page.evaluate(() => window.__w2.readCards('orders', '买家阿珍'));
+  check(orders.length === 2 && orders[0].lines.join(' ').includes('260918-33019522') && orders[0].canSend && !orders[0].lines.includes('发送订单'), `读取买家阿珍的 2 个订单：${orders[0].lines.join(' ')}`);
+  const tomOrders = await page.evaluate(() => window.__w2.readCards('orders', '买家Tom'));
+  check(tomOrders.length === 0, '没有订单的买家读到 0 条');
+  await page.evaluate(() => window.__w2.clickCard('orders', '买家阿珍', 1));
+  const card = await page.evaluate(() => window.__mock.state.convs['买家阿珍'].at(-1));
+  check(card.card && card.text.includes('260902-11873066'), `一键发送订单：${card.text}`);
+  const goods = await page.evaluate(() => window.__w2.readCards('goods'));
+  check(goods.length === 3 && goods[1].lines[0] === '羊毛围巾 加厚', `读取店铺商品 ${goods.length} 个`);
+  await page.evaluate(() => window.__w2.clickCard('goods', '买家小林', -1, '直筒牛仔裤'));
+  const g = await page.evaluate(() => window.__mock.state.convs['买家小林'].at(-1));
+  check(g.card && g.text.includes('直筒牛仔裤') && g.text.includes('https://mock.shop/item/1003'), `按商品名一键发送商品链接：${g.text}`);
+  // 11) 校准点选时点到「发送订单」按钮，不能真的发出去
+  const before11 = await page.evaluate(() => window.__mock.state.sentCards || 0);
+  await page.evaluate(() => { window.__picked = null; window.KefuDomCore.startPicker(document, { label: 't', onPick: r => { window.__picked = r; } }); });
+  await page.click('.order-card .order-send');
+  await page.waitForTimeout(200);
+  const after11 = await page.evaluate(() => ({ sent: window.__mock.state.sentCards || 0, picked: window.__picked }));
+  check(after11.sent === before11 && after11.picked && after11.picked.selector, `校准点选「发送订单」按钮不会真的发送（选择器 ${after11.picked && after11.picked.selector}）`);
   await browser.close();
   console.log(fails.length ? `\n失败 ${fails.length} 项` : '\n全部通过');
   process.exit(fails.length ? 1 : 0);

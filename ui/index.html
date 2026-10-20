@@ -26,6 +26,7 @@
     <button data-t="inbox" class="on">收件箱</button>
     <button data-t="backoffice">店铺后台</button>
     <button data-t="qa">知识库</button>
+    <button data-t="products">商品库</button>
     <button data-t="learn">学习</button>
     <button data-t="todos">待办<span class="count" id="todo-count" hidden></span></button>
     <button data-t="monitor">时效监控</button>
@@ -37,6 +38,10 @@
       <div id="inbox">
         <div id="convs"></div>
         <div id="thread"><div class="empty">各店铺的买家消息会汇总到这里。<br>先在左侧添加店铺，到「店铺后台」登录并校准。</div></div>
+        <aside id="side">
+          <div class="side-tabs"><button data-s="orders" class="on">订单</button><button data-s="goods">店铺商品</button><button data-s="lib">商品库</button></div>
+          <div id="side-body"><div class="empty">选择一个会话后，这里显示该买家的订单和可发送的商品。</div></div>
+        </aside>
       </div>
     </div>
 
@@ -53,11 +58,14 @@
           <button id="bo-edit">店铺设置</button>
         </div>
         <div id="calib">
-          <div class="toolbar"><b>校准：告诉软件页面上每个东西在哪</b><span class="spacer"></span><button id="cal-cancel" class="danger" hidden>取消点选</button><button id="cal-close" class="quiet">收起</button></div><div class="toolbar"><span class="lead" style="margin:0">点「点选」，再到下面的页面里点对应的位置。平台改版后重新点一次即可。</span></div>
-          <div class="cal-grid" id="cal-grid"></div>
-          <div class="toolbar" style="margin-top:10px"><span>转接步骤（JSON，{target} 会替换成人工子账号）</span></div>
-          <textarea id="cal-transfer" style="width:100%;height:70px;font-size:12px"></textarea>
-          <div class="toolbar" style="margin-top:6px"><button id="cal-save-transfer">保存转接步骤</button><span class="lead" style="margin:0">示例：[{"click":"转接按钮"},{"type":"搜索框","text":"{target}"},{"clickText":"客服列表项","text":"{target}"},{"click":"确认按钮"}]</span></div>
+          <div class="toolbar"><b>校准：告诉软件页面上每样东西在哪</b><span id="cal-progress" class="cs"></span><span class="spacer"></span>
+            <button id="cal-cancel" class="danger" hidden>取消点选</button><button id="cal-recheck" class="quiet">重新检查</button><button id="cal-close" class="quiet">收起</button></div>
+          <p class="lead" style="margin:0 0 8px">每一项：点右边的「点选」按钮 → 鼠标移到下面的店铺网页上，会出现橙色框 → 框住要找的东西时点一下。点完会显示「✓ 找到 N 个」。点错了就「重新点选」。每个店铺只需做一次，平台改版后重新点对应那一项即可。</p>
+          <div id="cal-groups"></div>
+          <section class="cal-group"><h4>⑤ 转接步骤<small>AI 答不了时，软件按这里的步骤在平台上把买家转给人工子账号。按你平时手动转接的顺序添加</small></h4>
+            <div id="cal-steps"></div>
+            <button id="cal-addstep">添加一步</button>
+          </section>
         </div>
         <div id="viewport"><div class="ph">在左侧选择一个店铺</div></div>
       </div>
@@ -75,6 +83,18 @@
       </div>
       <div class="toolbar"><input id="qa-try" placeholder="试一句买家的话，看会命中哪条" style="flex:1;max-width:520px"><button id="qa-try-btn">试试</button><span id="qa-try-out"></span></div>
       <table><thead><tr><th>问题 / 相似问法</th><th>答案</th><th>分类</th><th>品牌</th><th class="num">命中</th><th></th></tr></thead><tbody id="qa-body"></tbody></table>
+    </div>
+
+    <div class="page" id="p-products">
+      <h2>商品库</h2>
+      <p class="lead">在收件箱右侧「商品库」里可以搜索商品、一键把链接发给买家。买家问到某个商品（命中商品名或关键词）时，AI 回复后会自动补发这个商品的链接。匹配不需要模型。Excel 第一行写表头：商品名、链接、价格、介绍、关键词、品牌。</p>
+      <div class="toolbar">
+        <button class="primary" id="pd-import">导入 Excel</button>
+        <button id="pd-add">新增商品</button>
+        <span class="spacer"></span>
+        <input id="pd-search" placeholder="搜索商品" style="width:220px">
+      </div>
+      <table><thead><tr><th>商品名 / 关键词</th><th>价格</th><th>链接</th><th>介绍</th><th></th></tr></thead><tbody id="pd-body"></tbody></table>
     </div>
 
     <div class="page" id="p-learn">
@@ -138,6 +158,8 @@
           <label>先发安抚语（毫秒）</label><input id="s-holding-ms" type="number" step="1000" min="0"><div class="hint">0 表示不发。超过这个时长还没出结果，先回一句安抚语。</div>
           <label>平台自动回复关键词</label><input id="s-ignore" placeholder="例如：欢迎光临，感谢您的咨询">
           <div class="hint">平台自己发的欢迎语、自动回复里的关键词，用逗号分隔。含这些词的卖家消息不会被当成人工插话。</div>
+          <label>自动带商品链接</label><label class="chk"><input type="checkbox" id="s-autolink"> 买家问到「商品库」里的商品时，回复后自动补发该商品链接（每个买家每个商品只发一次）</label>
+          <label>参考订单信息</label><label class="chk"><input type="checkbox" id="s-useorder"> 模型作答前读取该买家的订单（需在校准里点选「订单卡片」）</label>
         </div>
         <h3 style="font-size:14px">必须人工处理的问题</h3>
         <p class="lead">命中关键词时：AI 托管 → 转接人工；离线接管 → 发对应保底话术并记待办。</p>

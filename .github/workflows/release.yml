@@ -72,7 +72,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { path: dist, merge-multiple: true }
       - name: 附上离线使用说明和知识库模板
-        run: cp docs/使用说明.html dist/user-guide-zh.html && cp samples/QA知识库模板.xlsx dist/qa-template.xlsx
+        run: cp docs/使用说明.html dist/user-guide-zh.html && cp samples/QA知识库模板.xlsx dist/qa-template.xlsx && cp samples/商品库模板.xlsx dist/product-template.xlsx
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.version }}

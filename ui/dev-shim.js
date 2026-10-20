@@ -29,23 +29,60 @@
     { id: 'q1', q: '有几个颜色', a: '亲，目前有黑色、白色、燕麦色三个颜色哦~', alts: ['有什么颜色', '颜色有哪些'], category: '售前', brand: '', hits: 128 },
     { id: 'q2', q: '多久发货', a: '亲，付款后48小时内发货，节假日顺延哦~', alts: ['什么时候发货'], category: '售前', brand: '', hits: 97 },
   ];
+  const products = [
+    { id: 'p1', name: '针织开衫 秋冬款', price: '¥189', url: 'https://shop.example.com/item/1001', desc: '羊毛混纺，黑/白/燕麦三色', kw: ['开衫', '针织+外套'] },
+    { id: 'p2', name: '羊毛围巾 加厚', price: '¥129', url: 'https://shop.example.com/item/1002', desc: '', kw: ['围巾'] },
+    { id: 'p3', name: '直筒牛仔裤', price: '¥159', url: 'https://shop.example.com/item/1003', desc: '', kw: ['牛仔裤', '裤子'] },
+  ];
   const lat = Array.from({ length: 140 }, (_, i) => ({ ts: now - i * 400000, ms: 800 + Math.round(Math.random() * 6000) + (i % 37 === 0 ? 16000 : 0), outcome: ['replied', 'replied', 'replied', 'transferred', 'fallback'][i % 5] }));
   const status = { seat: settings.seat, modeOverride: 'auto', effectiveMode: 'ai', away: false, idle: false, sync: { status: 'ok', humanOnline: true, peers: [{ seatId: 'h', name: '客服组-人工机', role: 'human', ageSec: 3 }] }, modelReady: true };
   const defaults = { qaDirectThreshold: 0.72, modelMinConfidence: 0.6, hardDeadlineMs: 18000, handoffMsg: '亲，这个问题我帮您转接专属客服，马上为您处理~', holdingAfterMs: 0,
     humanOnly: [{ category: '投诉', words: ['投诉', '差评', '人工'] }, { category: '售后', words: ['退款', '退货', '破损'] }, { category: '订单', words: ['改地址', '取消订单'] }, { category: '物流', words: ['物流', '快递', '到哪了'] }],
     fallback: { '订单': '亲，订单相关的修改我已经帮您记录下来了…', '物流': '亲，正在为您核实物流信息…', '售后': '亲，非常抱歉给您带来不便…', '投诉': '亲，非常抱歉让您有不好的体验…', '默认': '亲，您的问题已经收到…' } };
   const P = v => Promise.resolve(v);
+  // ---- 预览模式：把模拟店铺页放进 iframe，充当「店铺后台」里的内嵌网页（需通过 http 打开，同源才能操作 iframe）----
+  const params = new URLSearchParams(location.search);
+  const MOCK_SEL = { convList: '.conv-item', convUnread: '.badge', convName: '.conv-name', currentName: '#chat-title', msgItem: '#msg-list .msg', msgBuyer: '.msg.buyer', msgSeller: '.msg.seller', msgSystem: '.msg.system', msgText: '.bubble', input: '#reply-input', sendBtn: '#send-btn',
+    transferSteps: [{ click: '#transfer-btn' }, { type: '#transfer-search', text: '{target}' }, { clickText: '.agent-item', text: '{target}' }, { click: '#transfer-confirm' }],
+    orderItem: '.order-card', orderSend: '.order-card .order-send', goodsItem: '.goods-card', goodsSend: '.goods-card .goods-send' };
+  settings.stores[0].selectors = params.get('cal') === 'empty' ? {} : { ...MOCK_SEL };
+  const frame = document.createElement('iframe');
+  frame.src = '../mock/platform.html';
+  frame.style.cssText = 'position:fixed;border:0;display:none;z-index:1;background:#fff';
+  let fdoc = null, watcher = null;
+  frame.onload = () => {
+    fdoc = frame.contentDocument;
+    const sc = fdoc.createElement('script'); sc.src = '../adapters/dom-core.js';
+    sc.onload = () => { frame.contentWindow.__ready = true; resetWatcher(); };
+    fdoc.head.appendChild(sc);
+    // 预置几条对话和未读，截图更接近真实
+    const m = frame.contentWindow.__mock; if (m) { m.push('买家小林', 'buyer', '你好，这件开衫有几个颜色'); m.push('买家小林', 'seller', '亲，目前有黑色、白色、燕麦色三个颜色哦~'); m.push('买家小林', 'buyer', '燕麦色M码还有吗'); m.push('买家Tom', 'buyer', '多久发货'); }
+  };
+  function resetWatcher() { const C = frame.contentWindow.KefuDomCore; if (!C) return; if (watcher) watcher.stop(); watcher = C.createWatcher(fdoc, settings.stores[0].selectors, () => {}, { autoOpen: false }); }
+  window.addEventListener('load', () => document.body.appendChild(frame));
+  const core = () => frame.contentWindow.KefuDomCore;
+  function pickIn({ list, label }) {
+    if (window.__cancelPick) window.__cancelPick();
+    return new Promise(res => { const cleanup = core().startPicker(fdoc, { list, label, onPick: r => { window.__cancelPick = null; res(r); }, onCancel: () => { window.__cancelPick = null; res(null); } }); window.__cancelPick = () => { cleanup(); res(null); }; });
+  }
   window.kefu = {
     getState: () => P({ presets: { qwen: { label: '通义千问(阿里云百炼)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', needsKey: true, keyUrl: 'x' }, deepseek: { label: 'DeepSeek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash', needsKey: true, keyUrl: 'x' }, ollama: { label: '本地模型(Ollama)', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:8b', needsKey: false, keyUrl: 'x' }, claude: { label: 'Claude', baseUrl: 'https://api.anthropic.com', model: 'claude-haiku-5-5', needsKey: true } }, settings, platforms: { pinduoduo: { name: '拼多多', url: 'https://mms.pinduoduo.com/chat-merchant/index.html' }, tmall: { name: '天猫/淘宝' }, douyin: { name: '抖店(飞鸽)' }, jd: { name: '京东' }, youzan: { name: '有赞' }, wechat: { name: '微信/企业微信', kind: 'api' }, mock: { name: '模拟平台(测试)' } },
       status, convs: convs.map(({ msgs, ...c }) => c), health: { a: { input: true, msgItem: 12, convList: 8, currentConv: '买家小林' }, b: { notReady: true }, d: { input: true, msgItem: 3 } }, defaults }),
-    saveSettings: p => { Object.assign(settings, p); return P(settings); }, setViewport: v => { (window.__vp = window.__vp || []).push(v); return P(); }, storeAdd: s => P({ id: 'n', ...s }), storeUpdate: s => P(s), storeRemove: () => P(), storeReload: () => P(), storeClearLogin: () => P(), storeHealth: () => P({}),
-    calibrate: () => P(null), getConv: k => P(convs.find(c => c.key === k)), readConv: () => P(), manualSend: () => P(true), takeOver: () => P(), release: () => P(), correct: () => P({}),
+    saveSettings: p => { Object.assign(settings, p); return P(settings); }, setViewport: v => { (window.__vp = window.__vp || []).push(v); const b = v && v.storeId === 'a' && v.bounds; frame.style.display = b ? 'block' : 'none'; if (b) Object.assign(frame.style, { left: b.x + 'px', top: b.y + 'px', width: b.width + 'px', height: b.height + 'px' }); return P(); }, storeAdd: s => P({ id: 'n', ...s }), storeUpdate: s => { const i = settings.stores.findIndex(x => x.id === s.id); if (i >= 0) settings.stores[i] = { ...settings.stores[i], ...s }; return P(settings.stores[i]); }, storeRemove: () => P(), storeReload: () => P(), storeClearLogin: () => P(), storeHealth: () => P({}),
+    calibrate: async ({ field, list, label }) => { const r = await pickIn({ list, label }); if (r) { settings.stores[0].selectors[field] = r.selector; resetWatcher(); } return r; },
+    pick: ({ list, label }) => pickIn({ list, label }),
+    calibCheck: () => P(fdoc && core() ? core().countSelectors(fdoc, settings.stores[0].selectors) : null),
+    ordersGet: async key => { if (!watcher) throw new Error('还没校准「订单卡片」'); return watcher.readCards('orders', key.split('::')[1]); },
+    goodsGet: async () => { if (!watcher) throw new Error('还没校准「商品卡片」'); return watcher.readCards('goods'); },
+    cardSend: ({ key, kind, idx, matchText }) => watcher.clickCard(kind, key.split('::')[1], idx, matchText),
+    productList: q => P(products.filter(p => !q || (p.name + p.desc).includes(q))), productUpsert: p => { const i = products.findIndex(x => x.id === p.id); if (i >= 0) products[i] = p; else products.push({ ...p, id: 'p' + Date.now() }); return P(p); },
+    productRemove: id => { products.splice(products.findIndex(x => x.id === id), 1); return P(); }, productImport: () => P({ imported: 3, total: 3 }), productSend: () => P(true), getConv: k => P(convs.find(c => c.key === k)), readConv: () => P(), manualSend: () => P(true), takeOver: () => P(), release: () => P(), correct: () => P({}),
     qaList: () => P(qa), qaUpsert: x => P(x), qaRemove: () => P(), qaImport: () => P({ imported: 5, total: 7 }), qaExport: () => P(null), qaTest: () => P({ score: 0.81, item: qa[0] }),
     learnState: () => P({ readiness: [{ category: '售前', total: 64, agree: 59, rate: 59 / 64, ready: true }, { category: '物流', total: 12, agree: 5, rate: 5 / 12, ready: false }],
       candidates: [{ id: 'c1', q: '能开发票吗', alts: ['可以开发票不'], a: '可以的亲，下单后在订单页申请电子发票即可~', answers: ['可以的亲，下单后在订单页申请电子发票即可~', '可以开的，订单页申请就行'], count: 2, oneOff: false },
         { id: 'c2', q: '东西坏了怎么办', alts: [], a: '亲，已为您备注补发，单号 778812345 稍后同步', answers: ['亲，已为您备注补发，单号 778812345 稍后同步'], count: 1, oneOff: true, fromCorrection: true }], style: [] }),
     candApprove: () => P(), candReject: () => P(), todos: () => P([{ id: 't', storeId: 'a', buyer: '买家Tom', text: '退款怎么还没到', category: '售后', reason: '人工专属:退款', ts: now - 3600000, done: false }]), todoDone: () => P(),
-    storeBack: () => P(), cancelPick: () => P(), latency: () => P(lat), modelTest: () => P({ ms: 812, reply: '亲，有黑白两色哦~', formatOk: true }), modelList: () => P(['qwen-flash','qwen-plus','qwen-max']), openExternal: () => P(), setAway: a => P({ ...status, away: a }),
+    storeBack: () => P(), cancelPick: () => { window.__cancelPick && window.__cancelPick(); window.__cancelPick = null; return P(); }, latency: () => P(lat), modelTest: () => P({ ms: 812, reply: '亲，有黑白两色哦~', formatOk: true }), modelList: () => P(['qwen-flash','qwen-plus','qwen-max']), openExternal: () => P(), setAway: a => P({ ...status, away: a }),
     on: (ch, fn) => { (handlers[ch] = handlers[ch] || []).push(fn); },
   };
   window.addEventListener('load', () => setTimeout(() => traces.forEach(t => (handlers.trace || []).forEach(f => f(t))), 50));

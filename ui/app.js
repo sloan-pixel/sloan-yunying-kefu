@@ -46,7 +46,7 @@ function renderStores() {
       <span class="dot ${ok ? 'ok' : h ? 'warn' : ''}" title="${ok ? '已连接' : '未登录或未校准'}"></span></div>`;
   }).join('') || '<div class="empty">还没有店铺</div>';
 }
-$('#stores').onclick = e => { const el = e.target.closest('.store'); if (!el) return; st.selStore = el.dataset.id; renderStores(); showTab('backoffice'); if ($('#calib').classList.contains('on')) renderCalib(true); };
+$('#stores').onclick = e => { const el = e.target.closest('.store'); if (!el) return; st.selStore = el.dataset.id; renderStores(); showTab('backoffice'); if ($('#calib').classList.contains('on')) renderCalib(); };
 $('#add-store').onclick = () => storeDialog();
 
 function storeDialog(existing) {
@@ -98,7 +98,7 @@ function showTab(t) {
   $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   $$('.page').forEach(p => p.classList.toggle('on', p.id === 'p-' + t));
   if (t === 'backoffice') renderBackoffice(); else K.setViewport({ storeId: null, bounds: null });
-  ({ qa: renderQA, learn: renderLearn, todos: renderTodos, monitor: renderMonitor, settings: renderSettings }[t] || (() => {}))();
+  ({ qa: renderQA, products: renderProducts, learn: renderLearn, todos: renderTodos, monitor: renderMonitor, settings: renderSettings }[t] || (() => {}))();
 }
 $('#tabs').onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.t); };
 
@@ -112,7 +112,97 @@ function renderConvs() {
       <span class="pv">${c.paused ? '<span class="tag human">人工</span> ' : ''}${esc(storeName(c.storeId))}：${esc(c.preview || '')}</span></div>`).join('')
     || '<div class="empty">暂时没有会话</div>';
 }
-$('#convs').onclick = e => { const el = e.target.closest('.conv'); if (!el) return; st.selConv = el.dataset.k; K.readConv(st.selConv); renderConvs(); renderThread(); };
+$('#convs').onclick = e => { const el = e.target.closest('.conv'); if (!el) return; st.selConv = el.dataset.k; K.readConv(st.selConv); renderConvs(); renderThread(); renderSide(true); };
+
+// ---------------- 收件箱右侧：订单 / 店铺商品 / 商品库 ----------------
+st.sideTab = 'orders';
+$('#side .side-tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; st.sideTab = b.dataset.s; $$('#side .side-tabs button').forEach(x => x.classList.toggle('on', x === b)); renderSide(true); };
+const CAL_HINT = what => `<div class="side-err">这家店还没校准「${what}」。<br>到「店铺后台」→「校准」→「订单与商品」里点选一次即可，详见使用说明的「校准」一节。</div>`;
+// 订单卡片的文字通常是「标签、值」交替出现，能配对就排成两列
+function pairLines(lines) {
+  if (lines.length >= 4 && lines.length % 2 === 0 && lines.every((x, i) => i % 2 || x.length <= 6)) {
+    const out = []; for (let i = 0; i < lines.length; i += 2) out.push([lines[i], lines[i + 1]]); return out;
+  }
+  return null;
+}
+async function renderSide(reload) {
+  const body = $('#side-body');
+  const conv = st.selConv && st.convs.get(st.selConv);
+  if (!conv) { body.innerHTML = '<div class="empty">选择一个会话后，这里显示该买家的订单和可发送的商品。</div>'; return; }
+  const key = st.selConv, tab = st.sideTab;
+  if (tab === 'lib') return renderSideLib();
+  body.innerHTML = '<div class="empty">正在从店铺页面读取…</div>';
+  try {
+    const list = tab === 'orders' ? await K.ordersGet(key) : await K.goodsGet(conv.storeId);
+    if (st.selConv !== key || st.sideTab !== tab) return;
+    const bar = `<div class="side-bar"><span>${tab === 'orders' ? `${esc(conv.buyer)} 的订单 ${list.length} 个` : `店铺页面上的商品 ${list.length} 个`}</span><span class="spacer"></span><button class="quiet" data-refresh>刷新</button></div>`;
+    if (!list.length) { body.innerHTML = bar + `<div class="empty">${tab === 'orders' ? '该买家暂无订单' : '店铺页面上没有商品'}</div>`; return; }
+    body.innerHTML = bar + list.map(c => {
+      const pairs = pairLines(c.lines);
+      const main = pairs ? `<dl>${pairs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : `<div class="raw">${esc(c.lines.join('\n'))}</div>`;
+      return tab === 'orders'
+        ? `<div class="ocard">${main}<div class="acts">${c.canSend ? `<button data-send="${c.idx}" data-match="${esc(c.lines.find(x => /\d{6,}/.test(x)) || '')}">发送订单</button>` : ''}<button class="quiet" data-copy="${esc(c.lines.join(' '))}">复制</button></div></div>`
+        : `<div class="gcard"><span class="gn"><b>${esc(c.lines[0] || '')}</b><small>${esc(c.lines.slice(1).join(' '))}</small></span>${c.canSend ? `<button data-send="${c.idx}" data-match="${esc(c.lines[0] || '')}">发送</button>` : ''}</div>`;
+    }).join('');
+  } catch (err) {
+    if (st.selConv !== key) return;
+    const msg = String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    body.innerHTML = /还没校准/.test(msg) ? CAL_HINT(tab === 'orders' ? '订单卡片' : '商品卡片') : `<div class="side-err">读取失败：${esc(msg)}<br>请确认店铺已登录、页面停在客服工作台。</div><button data-refresh style="margin-top:8px">重试</button>`;
+  }
+}
+async function renderSideLib() {
+  const body = $('#side-body'); const q = st.libQuery || '';
+  const list = await K.productList(q);
+  body.innerHTML = `<div class="side-bar"><input id="lib-q" placeholder="搜索商品库" value="${esc(q)}" style="flex:1"></div>`
+    + (list.length ? list.slice(0, 100).map(p => `<div class="gcard"><span class="gn"><b>${esc(p.name)}</b><small>${esc([p.price, p.url].filter(Boolean).join(' '))}</small></span><button data-lib="${esc(p.id)}" ${p.url ? '' : 'disabled title="没有链接"'}>发送</button></div>`).join('')
+      : `<div class="empty">${q ? '没有找到' : '商品库是空的。到「商品库」页面导入 Excel 或新增商品。'}</div>`);
+  const inp = $('#lib-q'); inp.oninput = () => { clearTimeout(inp._t); inp._t = setTimeout(() => { st.libQuery = inp.value; renderSideLib().then(() => { const i = $('#lib-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }); }, 250); };
+}
+$('#side-body').onclick = async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.hasAttribute('data-refresh')) return renderSide(true);
+  if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => toast('已复制')); return; }
+  const key = st.selConv; const label = b.textContent; b.disabled = true; b.textContent = '发送中…';
+  try {
+    if (b.dataset.lib) await K.productSend({ key, id: b.dataset.lib });
+    else await K.cardSend({ key, kind: st.sideTab === 'orders' ? 'orders' : 'goods', idx: Number(b.dataset.send), matchText: b.dataset.match || '' });
+    toast('已发送');
+  } catch (err) { toast('发送失败：' + String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')); }
+  if (b.isConnected) { b.disabled = false; b.textContent = label; }
+};
+
+// ---------------- 商品库页面 ----------------
+async function renderProducts() {
+  const list = await K.productList($('#pd-search').value.trim());
+  $('#pd-body').innerHTML = list.map(p => `<tr><td><b style="font-weight:500">${esc(p.name)}</b>${p.kw?.length ? `<div class="alts">关键词：${esc(p.kw.join(' | '))}</div>` : ''}</td><td>${esc(p.price)}</td>
+    <td style="max-width:260px;word-break:break-all">${esc(p.url)}</td><td class="a">${esc(p.desc)}</td>
+    <td style="white-space:nowrap"><button class="quiet" data-edit="${esc(p.id)}">编辑</button><button class="quiet danger" data-del="${esc(p.id)}">删除</button></td></tr>`).join('')
+    || '<tr><td colspan="5" class="empty">商品库是空的。点「导入 Excel」（模板见安装包里的「商品库模板.xlsx」），或「新增商品」。</td></tr>';
+  $('#pd-body').onclick = async e => {
+    const id = e.target.dataset.edit || e.target.dataset.del; if (!id) return;
+    if (e.target.dataset.del) { if (confirm('删除这个商品？')) { await K.productRemove(id); renderProducts(); } return; }
+    productDialog(list.find(x => x.id === id));
+  };
+}
+function productDialog(p = {}) {
+  openDialog(`<h3>${p.id ? '编辑商品' : '新增商品'}</h3>
+    <div class="row"><label>商品名</label><input name="name" value="${esc(p.name || '')}"></div>
+    <div class="row"><label>链接</label><input name="url" value="${esc(p.url || '')}" placeholder="https://"></div>
+    <div class="row"><label>价格</label><input name="price" value="${esc(p.price || '')}" placeholder="例如 ¥189"></div>
+    <div class="row"><label>介绍（AI 回答时参考，可留空）</label><textarea name="desc" rows="2">${esc(p.desc || '')}</textarea></div>
+    <div class="row"><label>关键词（买家的话里出现就算问到这个商品，用 | 分隔；+ 表示都要出现）</label><input name="kw" value="${esc((p.kw || []).join(' | '))}" placeholder="例如：开衫 | 针织+外套"></div>
+    <div class="row"><label>品牌（留空 = 所有店铺通用）</label><input name="brand" value="${esc(p.brand || '')}"></div>
+    <div class="acts"><button data-act="cancel">取消</button><button class="primary" data-act="ok">保存</button></div>`,
+  async (act, f) => {
+    if (act !== 'ok') return true;
+    if (!f.name.trim()) { toast('请填写商品名'); return false; }
+    await K.productUpsert({ ...p, name: f.name.trim(), url: f.url.trim(), price: f.price.trim(), desc: f.desc.trim(), brand: f.brand.trim(), kw: f.kw.split(/[|｜,，]/).map(x => x.trim()).filter(Boolean) });
+    renderProducts(); return true;
+  });
+}
+$('#pd-add').onclick = () => productDialog();
+$('#pd-search').oninput = () => renderProducts();
+$('#pd-import').onclick = async () => { try { const r = await K.productImport(); if (r) { toast(`导入 ${r.imported} 个商品，商品库共 ${r.total} 个`); renderProducts(); } } catch (e) { toast('导入失败：' + e.message); } };
 
 async function renderThread() {
   if (!st.selConv) return;
@@ -171,11 +261,34 @@ function fixDialog(t, c) {
 }
 
 // ---------------- 店铺后台（内嵌网页） ----------------
-const CAL_FIELDS = [
-  ['convList', '会话列表里的一个会话', true], ['convUnread', '会话上的未读红点/数字', true], ['convName', '会话列表里的买家名字', true],
-  ['currentName', '当前聊天窗口顶部的买家名字', false], ['msgItem', '聊天记录里的一条消息（整行）', true], ['msgBuyer', '一条「买家」消息（整行）', true],
-  ['msgSeller', '一条「我方」消息（整行）', true], ['msgSystem', '一条系统提示/订单卡片（没有就跳过）', true], ['msgText', '消息里的文字气泡', true], ['input', '回复输入框', false], ['sendBtn', '发送按钮（没有就留空，用回车）', false],
+// 校准项：分组、说明、期望找到的数量
+const CAL_GROUPS = [
+  { name: '① 会话列表', desc: '页面左侧买家列表，用来发现新消息、切换买家', fields: [
+    ['convList', '会话列表里的一个买家（整行）', '点左侧买家列表里任意一行，点在空白处，不要点头像或名字文字', true, 'many'],
+    ['convUnread', '未读消息的红点或数字', '点任意一个买家旁边的红色未读数字；暂时没有未读可以先跳过，等有了再点', true, 'any', true],
+    ['convName', '列表里的买家名字', '点任意一行里的买家名字文字', true, 'many'],
+  ] },
+  { name: '② 聊天窗口', desc: '页面中间正在聊天的区域，用来读消息', fields: [
+    ['currentName', '聊天窗口顶部的买家名字', '先在左侧点开一个买家，再点聊天窗口顶部显示的买家名字', false, 'one'],
+    ['msgItem', '聊天记录里的一条消息（整行）', '点任意一条消息所在的整行，点在气泡旁边的空白处', true, 'many'],
+    ['msgBuyer', '一条买家发的消息（整行）', '点一条买家发的消息（通常在左边）所在的整行', true, 'any'],
+    ['msgSeller', '一条我方发的消息（整行）', '点一条我方发的消息（通常在右边）所在的整行', true, 'any'],
+    ['msgText', '消息的文字气泡', '点任意一条消息的文字气泡本身', true, 'many'],
+    ['msgSystem', '系统提示（可选）', '平台的灰色提示、"会话已转接"之类；没有就跳过', true, 'any', true],
+  ] },
+  { name: '③ 回复', desc: '页面底部的输入框和发送按钮，用来发回复', fields: [
+    ['input', '回复输入框', '点页面底部打字的输入框', false, 'one'],
+    ['sendBtn', '发送按钮（可选）', '点「发送」按钮；如果平台按回车就发送、没有按钮，可以跳过', false, 'one', true],
+  ] },
+  { name: '④ 订单与商品（可选）', desc: '页面右侧平台自带的订单栏、商品栏，用于收件箱右侧显示订单、一键发送', fields: [
+    ['orderItem', '一张订单卡片（整张）', '先点开一个有订单的买家，再点右侧订单栏里一张订单卡片的空白处', true, 'any', true],
+    ['orderSend', '订单卡片上的「发送」按钮', '点那张订单卡片上平台自带的「发送订单」按钮（不会真的发出去）', true, 'any', true],
+    ['goodsItem', '一张商品卡片（整张）', '点右侧商品栏里一个商品卡片的空白处', true, 'any', true],
+    ['goodsSend', '商品卡片上的「发送」按钮', '点那个商品卡片上平台自带的「发送」按钮（不会真的发出去）', true, 'any', true],
+  ] },
 ];
+const CAL_FIELDS = CAL_GROUPS.flatMap(g => g.fields);
+const STEP_TYPES = { click: '点击一个按钮', type: '在输入框里输入人工客服名', clickText: '在列表里点名字是人工客服的那一项' };
 function storeObj() { return st.settings.stores.find(s => s.id === st.selStore); }
 function renderBackoffice() {
   const s = storeObj();
@@ -204,31 +317,78 @@ $('#bo-hide').onclick = () => {
 // 全局 Esc：取消正在进行的点选
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && st.picking) K.cancelPick(st.selStore); });
 $('#bo-edit').onclick = () => storeObj() && storeDialog(storeObj());
-$('#bo-calib').onclick = () => { const on = $('#calib').classList.toggle('on'); $('#bo-calib').textContent = on ? '收起校准' : '校准'; renderCalib(true); requestAnimationFrame(syncViewport); };
+$('#bo-calib').onclick = () => { const on = $('#calib').classList.toggle('on'); $('#bo-calib').textContent = on ? '收起校准' : '校准'; if (on) renderCalib(); requestAnimationFrame(syncViewport); };
 $('#cal-close').onclick = () => $('#bo-calib').click();
 $('#cal-cancel').onclick = () => K.cancelPick(st.selStore);
-function renderCalib(withTransfer) {
+function calStatus(k, n, expect, sel, sample) {
+  if (!sel) return '<span class="cs none">未设置</span>';
+  if (n == null) return '<span class="cs">已设置</span>';
+  if (n === 0) return `<span class="cs warn">当前页面找到 0 个</span>`;
+  const seen = sample ? `<span class="sample" title="${esc(sample)}">识别到：${esc(sample)}</span>` : '';
+  if (expect === 'one' && n > 1) return `<span class="cs warn">找到 ${n} 个，应该只有 1 个，请重新点选</span>${seen}`;
+  return `<span class="cs ok">✓ 找到 ${n} 个</span>${seen}`;
+}
+async function renderCalib() {
   const s = storeObj(); if (!s) return;
   const sel = { ...(st.platforms[s.platform]?.selectors || {}), ...(s.selectors || {}) };
-  $('#cal-grid').innerHTML = CAL_FIELDS.map(([k, label, list]) => `<div class="cal ${sel[k] ? 'done' : ''}"><span class="lbl">${label}</span><code title="${esc(sel[k] || '')}">${esc(sel[k] || '未设置')}</code><button data-k="${k}" data-list="${list ? 1 : ''}" data-label="${esc(label)}">点选</button></div>`).join('');
-  if (withTransfer) $('#cal-transfer').value = JSON.stringify(sel.transferSteps || [], null, 0);
+  const chk = (await K.calibCheck(s.id).catch(() => null)) || {};
+  const counts = chk.counts || {}, samples = chk.samples || {};
+  const doneN = CAL_FIELDS.filter(f => !f[5] && sel[f[0]]).length, needN = CAL_FIELDS.filter(f => !f[5]).length;
+  $('#cal-progress').textContent = `必填项已完成 ${doneN}/${needN}`;
+  $('#cal-groups').innerHTML = CAL_GROUPS.map(g => `<section class="cal-group"><h4>${g.name}<small>${g.desc}</small></h4>
+    ${g.fields.map(([k, label, hint, list, expect, optional]) => `<div class="cal ${sel[k] ? 'done' : ''}" data-k="${k}">
+      <div class="lbl"><b>${label}</b><small>${hint}</small></div>
+      <span class="cst">${calStatus(k, counts[k], expect, sel[k], samples[k])}</span>
+      <button data-k="${k}" data-list="${list ? 1 : ''}" data-label="${esc(label)}">${sel[k] ? '重新点选' : '点选'}</button></div>`).join('')}</section>`).join('');
+  // 转接步骤以界面上的为准（每次修改已即时保存）；换了店铺或第一次打开时才从设置里读
+  if (st.stepsStore !== s.id) { st.stepsStore = s.id; renderSteps(sel.transferSteps || []); } else renderSteps(st.steps || []);
 }
-$('#cal-grid').onclick = async e => {
+function renderSteps(steps) {
+  st.steps = steps.map(x => ({ ...x }));
+  const type = x => (x.clickText ? 'clickText' : x.type ? 'type' : 'click');
+  $('#cal-steps').innerHTML = (st.steps.length ? st.steps.map((x, i) => `<div class="step" data-i="${i}"><span class="no">${i + 1}</span>
+      <select data-type="${i}">${Object.entries(STEP_TYPES).map(([k, v]) => `<option value="${k}" ${k === type(x) ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <span class="cs ${x.click || x.type || x.clickText ? 'ok' : 'none'}">${x.click || x.type || x.clickText ? '✓ 已点选' : '未点选'}</span>
+      <button data-pickstep="${i}">${x.click || x.type || x.clickText ? '重新点选' : '点选'}</button><button class="quiet danger" data-delstep="${i}">删除</button></div>`).join('')
+    : '<p class="lead" style="margin:4px 0">还没有转接步骤。按你在平台上手动转接的顺序，一步一步添加。</p>');
+}
+async function saveSteps() { const s = storeObj(); await K.storeUpdate({ ...s, selectors: { ...(s.selectors || {}), transferSteps: st.steps } }); await reload(); }
+$('#cal-addstep').onclick = () => { st.steps.push({ click: '' }); renderSteps(st.steps); };
+$('#cal-steps').onchange = async e => {
+  const i = e.target.dataset.type; if (i == null) return;
+  const t = e.target.value; const old = st.steps[i];
+  st.steps[i] = t === 'click' ? { click: '' } : t === 'type' ? { type: '', text: '{target}' } : { clickText: '', text: '{target}' };
+  if (!old.click && !old.type && !old.clickText) { /* 空步骤直接换类型 */ }
+  renderSteps(st.steps); await saveSteps();
+};
+$('#cal-steps').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.delstep != null) { st.steps.splice(+b.dataset.delstep, 1); renderSteps(st.steps); await saveSteps(); toast('已删除这一步'); return; }
+  const i = +b.dataset.pickstep; const x = st.steps[i]; const t = x.clickText != null ? 'clickText' : x.type != null ? 'type' : 'click';
+  const label = t === 'click' ? `第 ${i + 1} 步要点的按钮` : t === 'type' ? `第 ${i + 1} 步的搜索/输入框` : `第 ${i + 1} 步：客服列表里任意一个客服`;
+  const r = await doPick({ list: t === 'clickText', label });
+  if (!r) return;
+  st.steps[i] = { ...x, [t]: r.selector, ...(t !== 'click' ? { text: '{target}' } : {}) };
+  renderSteps(st.steps); await saveSteps(); toast(`第 ${i + 1} 步已记录`);
+};
+// 点选：先展开网页，提示去页面里点，Esc 或「取消点选」退出
+async function doPick({ field, list, label }) {
   showPage();
-  toast('到下面的页面里点「' + b.dataset.label + '」，按 Esc 或「取消点选」退出');
+  toast('到下面的页面里点「' + label + '」，按 Esc 或「取消点选」退出');
   st.picking = true; $('#cal-cancel').hidden = false;
   try {
-    const r = await K.calibrate({ storeId: st.selStore, field: b.dataset.k, list: !!b.dataset.list, label: b.dataset.label });
-    if (r) toast(`已记录：匹配到 ${r.count} 个「${r.sample || '元素'}」`); else toast('已取消点选');
-    await reload(); renderCalib();
-  } catch (err) { toast(/无响应/.test(err.message) ? '已取消点选' : '校准失败：' + err.message); }
+    const r = field ? await K.calibrate({ storeId: st.selStore, field, list, label }) : await K.pick({ storeId: st.selStore, list, label });
+    if (r) toast(`已记录：在页面上找到 ${r.count} 个「${r.sample || label}」`); else toast('已取消点选');
+    return r;
+  } catch (err) { toast(/无响应/.test(err.message) ? '已取消点选' : '点选失败：' + err.message); return null; }
   finally { st.picking = false; $('#cal-cancel').hidden = true; }
+}
+$('#cal-groups').onclick = async e => {
+  const b = e.target.closest('button[data-k]'); if (!b) return;
+  await doPick({ field: b.dataset.k, list: !!b.dataset.list, label: b.dataset.label });
+  await reload(); renderCalib();
 };
-$('#cal-save-transfer').onclick = async () => {
-  let steps; try { steps = JSON.parse($('#cal-transfer').value || '[]'); } catch { return toast('格式不对，请检查 JSON'); }
-  const s = storeObj(); await K.storeUpdate({ ...s, selectors: { ...(s.selectors || {}), transferSteps: steps } }); await reload(); toast('转接步骤已保存');
-};
+$('#cal-recheck').onclick = () => renderCalib();
 
 // ---------------- 知识库 ----------------
 async function renderQA() {
@@ -327,7 +487,7 @@ function renderSettings() {
   $('#s-seat-name').value = s.seat.name; $('#s-seat-role').value = s.seat.role; $('#s-auto-takeover').checked = !!s.autoTakeover; $('#s-idle').value = s.idleMinutes;
   $('#s-shopinfo').value = s.shopInfo || '';
   $('#s-sync-url').value = s.sync.url || ''; $('#s-sync-token').value = s.sync.token || ''; $('#s-sync-off').value = s.sync.offlineAfterSec || 30;
-  $('#s-qa-th').value = e.qaDirectThreshold; $('#s-model-th').value = e.modelMinConfidence; $('#s-deadline').value = e.hardDeadlineMs; $('#s-handoff').value = e.handoffMsg; $('#s-holding-ms').value = e.holdingAfterMs; $('#s-ignore').value = (e.ignoreSellerPatterns || []).join('，');
+  $('#s-qa-th').value = e.qaDirectThreshold; $('#s-model-th').value = e.modelMinConfidence; $('#s-deadline').value = e.hardDeadlineMs; $('#s-handoff').value = e.handoffMsg; $('#s-holding-ms').value = e.holdingAfterMs; $('#s-ignore').value = (e.ignoreSellerPatterns || []).join('，'); $('#s-autolink').checked = e.autoProductLink !== false; $('#s-useorder').checked = e.useOrderInfo !== false;
   renderModels();
   const groups = e.humanOnly || st.defaults.humanOnly;
   $('#s-humanonly').innerHTML = groups.map(g => `<div class="form" style="margin-bottom:8px" data-cat="${esc(g.category)}">
@@ -406,6 +566,7 @@ $('#s-save').onclick = async () => {
     engine: { ...(st.settings.engine || {}), qaDirectThreshold: num('#s-qa-th', 0.3, 1, st.defaults.qaDirectThreshold), modelMinConfidence: num('#s-model-th', 0, 1, st.defaults.modelMinConfidence),
       hardDeadlineMs: num('#s-deadline', 5000, 28000, st.defaults.hardDeadlineMs), handoffMsg: $('#s-handoff').value.trim() || st.defaults.handoffMsg,
       holdingAfterMs: num('#s-holding-ms', 0, 20000, 0), humanOnly, fallback,
+      autoProductLink: $('#s-autolink').checked, useOrderInfo: $('#s-useorder').checked,
       ignoreSellerPatterns: $('#s-ignore').value.split(/[,，、\n]+/).map(x => x.trim()).filter(Boolean) },
   };
   await K.saveSettings(patch); await reload(); toast('设置已保存');
@@ -424,7 +585,7 @@ K.on('trace', t => {
 });
 K.on('todo', () => { K.todos().then(t => updateTodoCount(t.filter(x => !x.done).length)); if (st.tab === 'todos') renderTodos(); });
 K.on('health', ({ storeId, health }) => { st.health[storeId] = health; renderStores(); if (storeId === st.selStore && st.tab === 'backoffice') renderBackoffice(); });
-K.on('docs', name => { if (name === 'qa' && st.tab === 'qa') renderQA(); if (name === 'todos' && st.tab === 'todos') renderTodos(); if (name === 'candidates' && st.tab === 'learn') renderLearn(); });
+K.on('docs', name => { if (name === 'products') { if (st.tab === 'products') renderProducts(); if (st.tab === 'inbox' && st.sideTab === 'lib') renderSide(); } if (name === 'qa' && st.tab === 'qa') renderQA(); if (name === 'todos' && st.tab === 'todos') renderTodos(); if (name === 'candidates' && st.tab === 'learn') renderLearn(); });
 
 async function reload() {
   const s = await K.getState();

@@ -55,10 +55,14 @@ ipcRenderer.on('pf:cmd', async (_, c) => {
       });
       return;
     }
+    // 校准检查：不依赖监听是否启动；这个框架里一个都没找到就返回空，让真正的聊天框架来回答
+    if (c.op === 'check') { if (!document.body) return reply(true, null); const r = core.countSelectors(document, c.selectors); return reply(true, r.total ? { counts: r.counts, samples: r.samples } : null); }
     if (!watcher) return reply(false, null, '本页面未就绪：请先登录并完成校准');
     if (c.op === 'send') return reply(true, await watcher.send(c.convId, c.text));
     if (c.op === 'transfer') return reply(true, await watcher.transfer(c.convId, c.target));
     if (c.op === 'health') return reply(true, watcher.health());
+    if (c.op === 'readCards') return reply(true, await watcher.readCards(c.kind, c.convId));
+    if (c.op === 'clickCard') return reply(true, await watcher.clickCard(c.kind, c.convId, c.idx, c.matchText));
     reply(false, null, '未知命令');
   } catch (e) { reply(false, null, e.message); }
 });

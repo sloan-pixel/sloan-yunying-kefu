@@ -12,7 +12,9 @@ const DEFAULTS = {
   hardDeadlineMs: 18000,      // 从收到消息算起，超过还没答复就发保底话术（目标 20s，极限 30s）
   holdingAfterMs: 0,          // >0 时，超过该时长还没出结果先发一句安抚（默认关闭）
   holdingMsg: '亲，在的~正在为您查询，请稍等哦',
-  ignoreSellerPatterns: [],   // 平台自动回复/欢迎语里的关键词：出现这些的卖家消息不算人工插话
+  ignoreSellerPatterns: [],
+  autoProductLink: true,      // 买家问到商品库里的商品时，回复后自动补发链接
+  useOrderInfo: true,         // 模型作答前读取该买家的订单作参考   // 平台自动回复/欢迎语里的关键词：出现这些的卖家消息不算人工插话
   handoffMsg: '亲，这个问题我帮您转接专属客服，马上为您处理~',
   humanOnly: [
     { category: '投诉', words: ['投诉', '差评', '12315', '举报', '骗子', '人工', '转人工', '真人'] },
@@ -38,6 +40,8 @@ class ReplyEngine extends EventEmitter {
     this.chains = new Map();    // convKey -> 正在处理的 Promise（同会话串行）
     this.takeoverPaused = new Set();  // 离线接管期间被人工接手的会话：模式切换后恢复
     this.removed = new Set();   // 已删除的店铺
+    this.expected = new Map();  // convKey -> { until, n }：刚点了平台的「发送订单/商品」按钮，接下来出现的卖家消息是本系统发的
+    this.sentProducts = new Map(); // convKey -> 已自动发过链接的商品 id
     this.paused = new Set();    // 人工手动接管的会话
     this.history = new Map();   // convKey -> 最近消息
     this.ourTexts = new Map();  // convKey -> 本系统刚发出的文本（用来区分人工回复）
@@ -72,7 +76,11 @@ class ReplyEngine extends EventEmitter {
   }
 
   // 判断页面上出现的卖家消息是不是本系统刚发的（平台会改空格、换行、截断）
+  // 点平台按钮发卡片时，卡片文字我们事先不知道：登记一个短时间窗口
+  expectOurs(k, ms = 8000, n = 1) { const e = this.expected.get(k); this.expected.set(k, { until: Date.now() + ms, n: (e && e.until > Date.now() ? e.n : 0) + n }); }
   isOurs(k, text) {
+    const e = this.expected.get(k);
+    if (e && e.until > Date.now() && e.n > 0) { e.n--; if (!e.n) this.expected.delete(k); return true; }
     const flat = t => String(t || '').replace(/\s+/g, '');
     const x = flat(text); const ours = this.ourTexts.get(k) || [];
     // 允许平台截断/改格式，但短的一方至少要有长的一方的 80%，避免人工的简短回复被误认成 AI 的
@@ -140,6 +148,7 @@ class ReplyEngine extends EventEmitter {
       if (decision.action === 'reply' && decision.reply) {
         await this.send(m, decision.reply);
         step('已回复', { source: decision.source });
+        await this.maybeSendProduct(m, step);
         return finish('replied');
       }
       if (mode === 'ai') {
@@ -180,7 +189,14 @@ class ReplyEngine extends EventEmitter {
       const remain = cfg.hardDeadlineMs - (Date.now() - t.received) - 1500;
       // 历史里去掉本次合并进来的几条买家消息，避免在提示词里重复
       const hist = this.history.get(this.key(m)) || [];
-      const r = await this.models.ask({ question: m.text, history: hist.slice(0, Math.max(0, hist.length - (m.parts || 1))),
+      // 托管/接管模式下读一下该买家的订单给模型参考（人工模式不动页面，免得切走人工正在看的会话）
+      let orderInfo = '';
+      if (mode !== 'human' && this.actions.getOrders && cfg.useOrderInfo !== false) {
+        const os = await Promise.race([this.actions.getOrders(m).catch(() => null), new Promise(r => setTimeout(() => r(null), 2500))]);
+        if (os && os.length) { orderInfo = os.slice(0, 3).map(o => o.lines.join(' ')).join('\n'); step('读取订单', { count: os.length }); }
+      }
+      const prod = this.products ? this.products.match(m.text, m.brand) : null;
+      const r = await this.models.ask({ question: m.text, orderInfo, product: prod?.item, history: hist.slice(0, Math.max(0, hist.length - (m.parts || 1))),
         references: this.qa.topK(m.text, m.brand, 5), style: this.learner.styleSamples.slice(-8),
         shopInfo: m.shopInfo, timeoutMs: Math.max(2000, Math.min(cfg.modelTimeoutMs, remain)) });
       step('模型作答', { provider: r.provider, ms: r.ms, confidence: r.confidence, action: r.action });
@@ -192,6 +208,17 @@ class ReplyEngine extends EventEmitter {
     } finally { clearTimeout(holding); }
   }
 
+  // 买家问到某个商品：回复之后自动补发这个商品的链接（每个会话每个商品只发一次）
+  async maybeSendProduct(m, step) {
+    if (!this.products || this.cfg().autoProductLink === false) return;
+    const hit = this.products.match(m.text, m.brand);
+    if (!hit || !hit.item.url) return;
+    const k = this.key(m); const sent = this.sentProducts.get(k) || new Set();
+    if (sent.has(hit.item.id)) return;
+    sent.add(hit.item.id); this.sentProducts.set(k, sent);
+    try { await this.send(m, [hit.item.name, hit.item.price, hit.item.url].filter(Boolean).join(' ')); step('已附商品链接', { product: hit.item.name }); }
+    catch (e) { step('商品链接发送失败', { err: e.message }); }
+  }
   async sendFallback(m, category, mode, reason, step) {
     const cfg = this.cfg();
     await this.send(m, cfg.fallback[category] || cfg.fallback['默认']);

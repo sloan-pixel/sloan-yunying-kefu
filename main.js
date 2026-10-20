@@ -10,6 +10,7 @@ const { ModelRouter, PRESETS } = require('./engine/llm');
 const { Learner } = require('./engine/learner');
 const { ReplyEngine, DEFAULTS } = require('./engine/router');
 const { SyncClient } = require('./engine/sync');
+const { ProductLib } = require('./engine/products');
 const PLATFORMS = require('./adapters/platforms.json');
 
 // 数据目录固定，不随软件改名而变化（店铺、登录状态、知识库都在这里）
@@ -23,7 +24,7 @@ app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(
 // 去掉 UA 里的 Electron 标记，平台看到的是普通 Chrome
 app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').replace(/\s?kefu-hub\/\S+/, '');
 
-let win, ui, store, qa, models, learner, engine, sync;
+let win, ui, store, qa, models, learner, engine, sync, products;
 const views = new Map();      // storeId -> { view, frames: Map, bestFrame, health, url }
 const pending = new Map();    // cmdId -> { resolve, reject, timer }
 const inbox = new Map();      // convKey -> { storeId, platform, convId, buyer, msgs[], last, unread }
@@ -212,7 +213,10 @@ app.whenReady().then(() => {
   qa = new QAKnowledge(store);
   models = new ModelRouter(S);
   learner = new Learner(store, qa);
-  engine = new ReplyEngine({ qa, models, learner, store, getSettings: S, actions: {
+  products = new ProductLib(store);
+  engine = new ReplyEngine({ qa, models, learner, store, products, getSettings: S, actions: {
+    // 读取该买家的订单（店铺没校准订单栏时返回 null）
+    getOrders: (m) => { const sel = platformConf(storeConf(m.storeId) || {}).selectors || {}; return sel.orderItem ? cmd(m.storeId, 'readCards', { kind: 'orders', convId: m.convId }, { timeout: 4000 }) : Promise.resolve(null); },
     send: (m, text) => cmd(m.storeId, 'send', { convId: m.convId, text }),
     transfer: (m) => cmd(m.storeId, 'transfer', { convId: m.convId, target: storeConf(m.storeId)?.humanTarget || '' }, { timeout: 20000 }),
   } });
@@ -264,6 +268,12 @@ H('calibrate', async ({ storeId, field, list, label }) => {
   saveSettings({ stores: S().stores.map(x => x.id === storeId ? { ...x, selectors } : x) }); pushConfig(storeId);
   return r;
 });
+// 只点选、不保存（转接步骤用）
+H('pick', ({ storeId, list, label }) => cmd(storeId, 'pick', { list, label }, { allFrames: true, timeout: 120000 }).finally(() => {
+  const r = views.get(storeId); if (r) for (const f of r.view.webContents.mainFrame.framesInSubtree) { try { f.send('pf:cancelPick'); } catch {} }
+}));
+// 校准检查：当前页面上每一项找到几个
+H('calibCheck', async storeId => { const st = storeConf(storeId); if (!st) return null; return cmd(storeId, 'check', { selectors: platformConf(st).selectors }, { allFrames: true, timeout: 3000 }).catch(() => null); });
 H('getConv', key => inbox.get(key) || null);
 H('readConv', key => { const c = inbox.get(key); if (c) { c.unread = 0; pushUI('conv', summarize(c)); } });
 H('manualSend', async ({ key, text }) => {
@@ -297,6 +307,30 @@ H('qaExport', async () => {
 });
 H('qaTest', ({ text, brand }) => { const m = qa.match(text, brand); return { score: m.score, via: m.via, item: m.item, top: qa.topK(text, brand, 3) }; });
 // 学习
+// 订单栏 / 商品栏（来自店铺页面）
+H('ordersGet', async key => { const c = inbox.get(key); if (!c) throw new Error('会话不存在'); return cmd(c.storeId, 'readCards', { kind: 'orders', convId: c.convId }, { timeout: 8000 }); });
+H('goodsGet', async storeId => cmd(storeId, 'readCards', { kind: 'goods' }, { timeout: 8000 }));
+H('cardSend', async ({ key, kind, idx, matchText }) => {
+  const c = inbox.get(key); if (!c) throw new Error('会话不存在');
+  engine.expectOurs(key);   // 平台按钮发出的卡片算本系统发的，不算人工插话
+  await cmd(c.storeId, 'clickCard', { kind, convId: c.convId, idx, matchText }, { timeout: 10000 });
+  return true;
+});
+// 商品库
+H('productList', q => products.search(q));
+H('productUpsert', p => products.upsert(p));
+H('productRemove', id => products.remove(id));
+H('productImport', async () => {
+  const r = await dialog.showOpenDialog(win, { title: '导入商品库', filters: [{ name: 'Excel / CSV', extensions: ['xlsx', 'csv'] }], properties: ['openFile'] });
+  if (r.canceled) return null;
+  return products.importFile(r.filePaths[0]);
+});
+H('productSend', async ({ key, id }) => {
+  const c = inbox.get(key); if (!c) throw new Error('会话不存在');
+  const p = products.items.find(x => x.id === id); if (!p) throw new Error('商品不存在');
+  await engine.send({ storeId: c.storeId, convId: c.convId }, ProductLib.linkText(p));
+  return true;
+});
 H('learnState', () => ({ candidates: learner.candidates.filter(c => c.status === 'pending'), readiness: learner.readiness(), style: learner.styleSamples.slice(-10) }));
 H('candApprove', ({ id, edits }) => learner.approve(id, edits));
 H('candReject', id => learner.reject(id));

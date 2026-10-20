@@ -20,6 +20,15 @@
   #sim input{flex:1;padding:5px;border:1px solid #ddd;border-radius:4px}
   #transfer-dlg{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center}
   #transfer-dlg .panel{background:#fff;border-radius:8px;padding:16px;width:300px}
+  #side{width:270px;background:#fff;border-left:1px solid #e5e5e5;overflow:auto;font-size:13px}
+  #side h4{margin:0;padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;background:#fafafa}
+  .order-card,.goods-card{margin:8px 10px;border:1px solid #eee;border-radius:6px;padding:8px 10px}
+  .order-card .row{display:flex;justify-content:space-between;color:#555;line-height:1.7} .order-card .row b{color:#222;font-weight:500}
+  .order-card .status{color:#e02e24} .order-card button,.goods-card button{margin-top:6px;padding:3px 10px;font-size:12px}
+  .goods-card{display:flex;gap:8px;align-items:center} .goods-card .pic{width:44px;height:44px;border-radius:4px;background:#f3d5d2;flex:none}
+  .goods-card .info{flex:1;min-width:0} .goods-card .gname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .goods-card .price{color:#e02e24}
+  .empty-tip{color:#999;padding:12px}
+  .msg.card .bubble{background:#fff8e6;border:1px solid #f3dca6}
   .agent-item{padding:6px;border:1px solid #eee;border-radius:4px;margin:4px 0;cursor:pointer} .agent-item.sel{border-color:#e02e24;background:#fff1f0}
 </style></head>
 <body>
@@ -33,6 +42,10 @@
       <div style="display:flex;flex-direction:column;gap:6px"><button id="send-btn">发送</button><button id="transfer-btn" class="ghost">转接</button></div></div>
     <div id="sim">🧪 模拟买家：<select id="sim-buyer"></select><input id="sim-text" placeholder="买家说的话，例如：这个有几个颜色"><button id="sim-send">买家发送</button></div>
   </div>
+  <aside id="side">
+    <h4>买家订单</h4><div id="order-list"></div>
+    <h4>店铺商品</h4><div id="goods-list"></div>
+  </aside>
 </main>
 <div id="transfer-dlg"><div class="panel"><b>转接给其他客服</b>
   <input id="transfer-search" placeholder="搜索客服账号" style="width:100%;margin:8px 0;padding:5px">
@@ -41,25 +54,48 @@
 </div></div>
 <script>
 // 模拟一个“受控输入框”的前端框架：只有收到 input 事件，内部状态才会更新
-const state = { draft: '', current: null, convs: { '买家小林': [], '买家阿珍': [], '买家Tom': [] }, unread: {}, agents: ['人工客服-小美', '人工客服-阿强', '客服主管'], pick: null, transfers: [] };
+const state = { draft: '', current: null, convs: { '买家小林': [], '买家阿珍': [], '买家Tom': [] }, unread: {}, agents: ['人工客服-小美', '人工客服-阿强', '客服主管'], pick: null, transfers: [],
+  orders: {
+    '买家小林': [{ no: '260921-58830147', goods: '针织开衫 燕麦色 M', amount: '¥189.00', status: '待发货', logistics: '仓库拣货中' }],
+    '买家阿珍': [{ no: '260918-33019522', goods: '羊毛围巾 黑色', amount: '¥129.00', status: '已发货', logistics: '中通 7512 3390 1287，运输中' },
+                 { no: '260902-11873066', goods: '针织开衫 白色 L', amount: '¥189.00', status: '已签收', logistics: '9月5日已签收' }],
+    '买家Tom': [],
+  },
+  goods: [{ id: 'g1', name: '针织开衫 秋冬款', price: '¥189', url: 'https://mock.shop/item/1001' }, { id: 'g2', name: '羊毛围巾 加厚', price: '¥129', url: 'https://mock.shop/item/1002' }, { id: 'g3', name: '直筒牛仔裤', price: '¥159', url: 'https://mock.shop/item/1003' }] };
 const $ = s => document.querySelector(s);
 function renderConvs() {
   $('#convs').innerHTML = Object.keys(state.convs).map(n => `<div class="conv-item ${n === state.current ? 'active' : ''}" data-n="${n}"><span class="conv-name">${n}</span>${state.unread[n] ? `<span class="badge">${state.unread[n]}</span>` : ''}</div>`).join('');
   $('#sim-buyer').innerHTML = Object.keys(state.convs).map(n => `<option ${n === $('#sim-buyer').value ? 'selected' : ''}>${n}</option>`).join('');
 }
+function renderSide() {
+  const os = state.orders[state.current] || [];
+  $('#order-list').innerHTML = !state.current ? '<div class="empty-tip">请选择会话</div>' : os.length ? os.map((o, i) => `<div class="order-card" data-i="${i}">
+      <div class="row"><span>订单号</span><b class="order-no">${o.no}</b></div>
+      <div class="row"><span>商品</span><b>${o.goods}</b></div>
+      <div class="row"><span>实付</span><b>${o.amount}</b></div>
+      <div class="row"><span>状态</span><b class="status">${o.status}</b></div>
+      <div class="row"><span>物流</span><b>${o.logistics}</b></div>
+      <button class="order-send">发送订单</button></div>`).join('') : '<div class="empty-tip">该买家暂无订单</div>';
+  $('#goods-list').innerHTML = state.goods.map(g => `<div class="goods-card" data-id="${g.id}"><div class="pic"></div><div class="info"><div class="gname">${g.name}</div><div class="price">${g.price}</div><button class="goods-send">发送商品</button></div></div>`).join('');
+}
 function renderMsgs() {
   $('#chat-title').textContent = state.current || '请选择会话';
+  renderSide();
   // 每次重新生成 DOM（模拟虚拟列表重渲染）
-  $('#msg-list').innerHTML = (state.convs[state.current] || []).map(m => `<div class="msg ${m.from}" data-id="${m.id}"><div class="bubble">${m.text}</div></div>`).join('');
+  $('#msg-list').innerHTML = (state.convs[state.current] || []).map(m => `<div class="msg ${m.from}${m.card ? ' card' : ''}" data-id="${m.id}"><div class="bubble">${m.text}</div></div>`).join('');
   $('#msg-list').scrollTop = 1e9;
 }
 let seq = 0;
-function push(conv, from, text) {
-  state.convs[conv].push({ id: 'm' + (++seq), from, text, ts: Date.now() });
+function push(conv, from, text, card) {
+  state.convs[conv].push({ id: 'm' + (++seq), from, text, card, ts: Date.now() });
   if (from === 'buyer' && conv !== state.current) state.unread[conv] = (state.unread[conv] || 0) + 1;
   renderConvs(); if (conv === state.current) renderMsgs();
 }
 document.addEventListener('click', e => {
+  const os = e.target.closest('.order-send');
+  if (os && state.current) { const o = state.orders[state.current][Number(os.closest('.order-card').dataset.i)]; push(state.current, 'seller', `【订单】${o.no}｜${o.goods}｜${o.amount}｜${o.status}`, true); state.sentCards = (state.sentCards || 0) + 1; return; }
+  const gs = e.target.closest('.goods-send');
+  if (gs && state.current) { const g = state.goods.find(x => x.id === gs.closest('.goods-card').dataset.id); push(state.current, 'seller', `【商品】${g.name} ${g.price} ${g.url}`, true); state.sentCards = (state.sentCards || 0) + 1; return; }
   const it = e.target.closest('.conv-item');
   if (it) { state.current = it.dataset.n; state.unread[state.current] = 0; setTimeout(() => { renderConvs(); renderMsgs(); }, 120); $('#chat-title').textContent = state.current; }
 });

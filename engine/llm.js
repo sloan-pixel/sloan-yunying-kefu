@@ -86,11 +86,13 @@ class ModelRouter {
   // settings.models: [{ id, preset, apiKey, model, baseUrl, enabled }]
   constructor(getSettings) { this.getSettings = getSettings; this.stats = {}; }
   providers() { return (this.getSettings().models || []).map(resolve).filter(usable); }
-  async ask({ question, history = [], references = [], style = [], shopInfo = '', timeoutMs }) {
+  async ask({ question, history = [], references = [], style = [], shopInfo = '', orderInfo = '', product = null, timeoutMs }) {
     const s = this.getSettings();
     const refs = references.map((r, i) => `${i + 1}. 问：${r.item.q}\n   答：${r.item.a}`).join('\n') || '（无）';
     const styleText = style.length ? `\n【本店人工客服的说话习惯，模仿语气即可，不要照抄内容】\n${style.map(x => '- ' + x).join('\n')}` : '';
-    const system = `${SYSTEM}\n\n【店铺信息】${shopInfo || s.shopInfo || '（未填写）'}\n【参考资料】\n${refs}${styleText}`;
+    const orderText = orderInfo ? `\n【该买家的订单（来自平台页面，可据此回答订单状态、物流；不要编造页面上没有的信息）】\n${orderInfo}` : '';
+    const prodText = product ? `\n【买家问到的商品】${product.name}${product.price ? '，价格 ' + product.price : ''}${product.desc ? '，' + product.desc : ''}（链接会另外自动发送，回复里不用写链接）` : '';
+    const system = `${SYSTEM}\n\n【店铺信息】${shopInfo || s.shopInfo || '（未填写）'}\n【参考资料】\n${refs}${orderText}${prodText}${styleText}`;
     const turns = [...history.slice(-6).map(h => ({ role: h.from === 'buyer' ? 'user' : 'assistant', content: h.text })),
       { role: 'user', content: question }];
     // 合并相邻同角色（部分模型要求一问一答交替）

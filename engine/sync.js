@@ -48,7 +48,7 @@ class SyncClient extends EventEmitter {
     if (!this.conf().url || this.syncing) return;
     this.syncing = true;   // 上一轮没结束不开始下一轮
     try {
-      for (const name of ['qa', 'candidates', 'todos']) {
+      for (const name of ['qa', 'candidates', 'todos', 'products']) {
         try {
           const t0 = Date.now();   // 在取数据之前记时间：请求期间的新改动下一轮还会推
           const local = this.store.get(name, []);

@@ -57,7 +57,23 @@ h2{font-size:17px;margin:0 0 4px;font-weight:600} .lead{color:var(--muted);margi
 .spacer{flex:1}
 
 /* 收件箱 */
-#inbox{display:grid;grid-template-columns:300px 1fr;height:100%}
+#inbox{display:grid;grid-template-columns:280px 1fr 300px;height:100%}
+#side{border-left:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;min-height:0}
+.side-tabs{display:flex;border-bottom:1px solid var(--line)}
+.side-tabs button{flex:1;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:10px 4px 8px;color:var(--muted)}
+.side-tabs button.on{color:var(--ink);border-bottom-color:var(--mode);font-weight:600}
+#side-body{flex:1;overflow:auto;padding:10px}
+#side-body .empty{padding:24px 8px;font-size:13px}
+.side-bar{display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.ocard{border:1px solid var(--line);border-radius:var(--r-md);padding:8px 10px;margin-bottom:8px;font-size:13px}
+.ocard dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0}
+.ocard dt{color:var(--muted)} .ocard dd{margin:0;word-break:break-all}
+.ocard .acts{margin-top:6px;display:flex;gap:6px}
+.ocard .raw{white-space:pre-wrap}
+.gcard{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:var(--r-md);padding:7px 9px;margin-bottom:6px;font-size:13px}
+.gcard .gn{flex:1;min-width:0} .gcard .gn b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .gcard .gn small{color:var(--muted)}
+.side-err{color:var(--takeover);font-size:13px;line-height:1.6}
+@media (max-width:1300px){#inbox{grid-template-columns:240px 1fr 260px}}
 #convs{border-right:1px solid var(--line);overflow:auto;background:var(--surface)}
 .conv{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;display:grid;grid-template-columns:26px 1fr auto;gap:2px 10px;align-items:center}
 .conv:hover{background:var(--sunken)} .conv.sel{background:var(--mode-soft)}
@@ -92,7 +108,7 @@ h2{font-size:17px;margin:0 0 4px;font-weight:600} .lead{color:var(--muted);margi
 #bo-bar{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
 #viewport{flex:1;position:relative;background:var(--sunken)}
 #viewport .ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)}
-#calib{display:none;background:var(--surface);border-bottom:1px solid var(--line);padding:10px 12px}
+#calib{display:none;background:var(--surface);border-bottom:1px solid var(--line);padding:10px 12px;max-height:48vh;overflow:auto}
 #calib.on{display:block}
 .cal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
 .cal{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:var(--r-sm);padding:5px 8px}
@@ -139,3 +155,15 @@ dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
 dialog{position:relative}
 .dlg-x{position:absolute;top:8px;right:8px;font-size:15px;line-height:1;padding:6px 9px}
 #rail .brand{padding:14px 14px 10px;font-size:15px;font-weight:600;border-bottom:1px solid var(--line);letter-spacing:.01em}
+
+.cal-group{border:1px solid var(--line);border-radius:var(--r-md);padding:8px 10px;margin-bottom:8px}
+.cal-group h4{margin:0 0 6px;font-size:13px} .cal-group h4 small{font-weight:400;color:var(--muted);margin-left:8px}
+#cal-groups .cal{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;border:0;border-top:1px solid var(--line);border-radius:0;padding:6px 0}
+#cal-groups .cal:first-of-type{border-top:0}
+#cal-groups .cal .lbl b{font-weight:500;display:block} #cal-groups .cal .lbl small{color:var(--muted);font-size:12px}
+.cs{font-size:12px;color:var(--muted);white-space:nowrap;margin-left:8px} .cs.ok{color:var(--ok)} .cs.warn{color:var(--takeover)} .cs.none{color:var(--faint)}
+.step{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.step .no{width:22px;height:22px;border-radius:50%;background:var(--sunken);display:grid;place-items:center;font-size:12px;flex:none}
+.cst{display:flex;flex-direction:column;align-items:flex-end;max-width:320px}
+.cst .sample{font-size:11.5px;color:var(--muted);max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.form label.chk{color:inherit}

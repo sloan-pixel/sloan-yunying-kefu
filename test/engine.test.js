@@ -122,6 +122,37 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   eng.onSellerMessage({ storeId: 's1', platform: 'mock', convId: 'T', text: '欢迎光临本店～' });
   check(!eng.paused.has('s1::T'), '配置的平台自动欢迎语不算人工插话');
 
+  // 商品库 + 订单信息 + 卡片发送识别
+  {
+    const { ProductLib } = require('../engine/products');
+    const plib = new ProductLib(store);
+    plib.upsert({ name: '针织开衫 秋冬款', url: 'https://shop.example.com/item/1001', price: '¥189', kw: ['开衫'] });
+    check(plib.match('这件开衫有M码吗')?.item.name === '针织开衫 秋冬款', '商品库：关键词命中商品');
+    check(!plib.match('你们发什么快递'), '商品库：无关问题不命中');
+    const s2 = [], asks = [];
+    const set2 = { mode: 'ai', engine: { mergeWindowMs: 50, hardDeadlineMs: 3000, humanOnly: [] } };
+    const eng2 = new ReplyEngine({ qa, learner, store, products: plib, getSettings: () => set2,
+      models: { ask: async a => { asks.push(a); return { reply: '有的亲', action: 'reply', confidence: 0.9, category: '售前', provider: 'fake', ms: 1 }; } },
+      actions: { send: async (m, t) => s2.push(t), transfer: async () => true,
+        getOrders: async () => [{ lines: ['订单号 123', '状态 待发货'] }] } });
+    eng2.onBuyerMessage({ storeId: 's2', platform: 'mock', convId: 'P', buyer: 'P', text: '开衫M码还有货吗', receivedAt: Date.now() });
+    await wait(300);
+    check(s2.length === 2 && s2[1].includes('item/1001'), `回复后自动补发商品链接：${s2.join(' / ')}`);
+    check(asks[0]?.orderInfo.includes('待发货') && asks[0]?.product?.name === '针织开衫 秋冬款', '模型作答时带上订单信息和商品信息');
+    eng2.onBuyerMessage({ storeId: 's2', platform: 'mock', convId: 'P', buyer: 'P', text: '开衫起球吗', receivedAt: Date.now() });
+    await wait(300);
+    check(s2.length === 3, '同一会话同一商品链接只发一次');
+    set2.engine.autoProductLink = false;
+    eng2.onBuyerMessage({ storeId: 's2', platform: 'mock', convId: 'Q', buyer: 'Q', text: '开衫有现货吗', receivedAt: Date.now() });
+    await wait(300);
+    check(s2.length === 4, '关闭「自动带链接」后不补发');
+    eng2.expectOurs('s2::R');
+    eng2.onSellerMessage({ storeId: 's2', platform: 'mock', convId: 'R', text: '【订单】123 待发货' });
+    check(!eng2.paused.has('s2::R'), '一键发送的订单卡片不被当成人工插话');
+    eng2.onSellerMessage({ storeId: 's2', platform: 'mock', convId: 'R', text: '亲我来帮您看下' });
+    check(eng2.paused.has('s2::R'), '之后人工真实回复仍会被识别为接管');
+  }
+
   const lat = store.get('latency', []);
   console.log(`\n记录 ${lat.length} 条耗时，最大 ${Math.max(...lat.map(x => x.ms))}ms`);
   store.flushAll();
