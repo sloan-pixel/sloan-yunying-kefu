@@ -18,8 +18,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22 }
       - run: npm install --ignore-scripts
       - run: npm test
@@ -36,11 +36,18 @@ jobs:
             args: --win nsis zip -c.win.signAndEditExecutable=true
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22 }
       - run: npm install
-      - run: npx electron-builder ${{ matrix.args }} --publish never
+      - name: 打包
+        shell: bash
+        run: |
+          set -o pipefail
+          npx electron-builder ${{ matrix.args }} --publish never 2>&1 | tee build.log || {
+            echo "::error title=打包失败::$(grep -iE 'error|failed|⨯' build.log | tail -15 | tr '\n' ' ' | cut -c1-3000)"
+            exit 1
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.os }}
@@ -54,7 +61,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: v
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
