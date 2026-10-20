@@ -15,7 +15,8 @@
 | --- | --- | --- |
 | Mac（Apple 芯片：M1/M2/M3/M4） | `Sloan云盈客服助手-版本号-mac-arm64.dmg` | 双击打开，把图标拖进「应用程序」 |
 | Mac（Intel 芯片） | `Sloan云盈客服助手-版本号-mac-x64.dmg` | 同上 |
-| Windows 10/11 | `Sloan云盈客服助手-版本号-win-x64.zip` | 解压到任意文件夹，双击 `Sloan云盈客服助手.exe` |
+| Windows 10/11 | `Sloan云盈客服助手-版本号-win-x64.exe` | 双击安装（推荐） |
+| Windows 10/11（免安装） | `Sloan云盈客服助手-版本号-win-x64.zip` | 解压到任意文件夹，双击 `Sloan云盈客服助手.exe` |
 
 **第一次打开时的系统提示**（软件没有购买苹果/微软的开发者签名，属正常现象）：
 
@@ -83,6 +84,15 @@ npm run dist         # 产物在 dist/：两个 .dmg 和一个 Windows .zip
 ```
 
 或双击 `打包安装程序.command`。
+
+### 发布新版本
+
+仓库已配置 GitHub Actions（`.github/workflows/release.yml`）：改好 `package.json` 里的 `version`，提交后推送一个同名标签，GitHub 会自动跑测试、在 Mac 和 Windows 机器上打包，并把安装包发布到 Releases。
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
 
 ### 代码结构
 

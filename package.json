@@ -71,8 +71,10 @@
       "signAndEditExecutable": false,
       "icon": "build/icon.png"
     },
-    "electronDownload": {
-      "mirror": "https://npmmirror.com/mirrors/electron/"
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Sloan云盈客服助手-${version}-win-${arch}.${ext}"
     }
   }
 }

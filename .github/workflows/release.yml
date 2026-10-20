@@ -1,0 +1,66 @@
+# 推送 v 开头的标签（如 v1.0.1）时，自动在 GitHub 的 Mac 和 Windows 机器上打包，并发布到 Releases
+name: 打包并发布安装包
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --ignore-scripts
+      - run: npm test
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --mac
+          - os: windows-latest
+            args: --win nsis zip -c.win.signAndEditExecutable=true
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install
+      - run: npx electron-builder ${{ matrix.args }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: 附上离线使用说明和知识库模板
+        run: cp docs/使用说明.html samples/QA知识库模板.xlsx dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Sloan云盈客服助手 ${{ github.ref_name }}
+          body_path: docs/release-notes.md
+          files: dist/*
