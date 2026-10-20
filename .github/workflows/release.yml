@@ -1,4 +1,5 @@
-# 推送 v 开头的标签（如 v1.0.1）时，自动在 GitHub 的 Mac 和 Windows 机器上打包，并发布到 Releases
+# 推送 v 开头的标签（如 v1.0.1），或在 Actions 页面手动点「Run workflow」时：
+# 自动在 GitHub 的 Mac 和 Windows 机器上打包，并发布到 Releases（版本号取自 package.json）
 name: 打包并发布安装包
 
 on:
@@ -51,16 +52,19 @@ jobs:
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with: { path: dist, merge-multiple: true }
       - name: 附上离线使用说明和知识库模板
         run: cp docs/使用说明.html samples/QA知识库模板.xlsx dist/
       - uses: softprops/action-gh-release@v2
         with:
-          name: Sloan云盈客服助手 ${{ github.ref_name }}
+          tag_name: v${{ steps.v.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Sloan云盈客服助手 v${{ steps.v.outputs.version }}
           body_path: docs/release-notes.md
           files: dist/*
