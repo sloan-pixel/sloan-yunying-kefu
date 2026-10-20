@@ -57,7 +57,7 @@
       "icon": "build/icon.png"
     },
     "dmg": {
-      "title": "Sloan云盈客服助手"
+      "title": "SloanYunying ${version}"
     },
     "win": {
       "target": [

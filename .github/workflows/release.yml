@@ -31,7 +31,7 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            args: --mac
+            args: --mac dmg --arm64
           - os: windows-latest
             args: --win nsis zip -c.win.signAndEditExecutable=true
     runs-on: ${{ matrix.os }}
@@ -44,7 +44,12 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npx electron-builder ${{ matrix.args }} --publish never 2>&1 | tee build.log || {
+          build() { npx electron-builder "$@" --publish never 2>&1 | tee -a build.log; }
+          ok=1
+          build ${{ matrix.args }} || { sleep 10; build ${{ matrix.args }}; } || ok=0
+          # Mac：Intel 版单独再打一次（两个架构同时挂载磁盘映像会冲突）
+          if [ "$ok" = 1 ] && [ "${{ runner.os }}" = "macOS" ]; then build --mac dmg --x64 || { sleep 10; build --mac dmg --x64; } || ok=0; fi
+          [ "$ok" = 1 ] || {
             echo "::error title=打包失败::$(grep -iE 'error|failed|⨯' build.log | tail -15 | tr '\n' ' ' | cut -c1-3000)"
             exit 1
           }
