@@ -1,7 +1,7 @@
 {
   "name": "kefu-hub",
   "productName": "Sloan云盈客服助手",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sloan云盈客服助手：多平台多店铺客服整合 IM，内嵌商家后台、任意模型 AI 自动应答、影子学习、平台转接、人工离线接管",
   "main": "main.js",
   "author": "Little A",
@@ -26,7 +26,7 @@
   "build": {
     "appId": "ai.littlea.yunying",
     "productName": "Sloan云盈客服助手",
-    "artifactName": "Sloan云盈客服助手-${version}-${os}-${arch}.${ext}",
+    "artifactName": "SloanYunying-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -74,7 +74,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "Sloan云盈客服助手-${version}-win-${arch}.${ext}"
+      "artifactName": "SloanYunying-${version}-win-${arch}-setup.${ext}"
     }
   }
 }

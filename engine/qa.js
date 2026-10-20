@@ -103,7 +103,10 @@ const HEAD = {
   alt: ['相似问法', '相似问题', '扩展问法', '同义问法'],
   cat: ['分类', '类别', '场景', 'category'],
   brand: ['品牌', '店铺', '适用店铺', 'brand'],
+  kw: ['关键词', '关键字', 'keywords', 'keyword'],
 };
+// 关键词写法：用 | 或 , 分隔多组，任意一组命中即可；一组里用 + 连接表示“都要出现”，如：多久+发|发货时间
+const splitKw = v => String(v || '').split(/[|｜,，;；\n]/).map(x => x.trim()).filter(Boolean);
 function rowsToQA(rows, source) {
   if (!rows.length) return [];
   const head = rows[0].map(h => String(h || '').trim().toLowerCase());
@@ -118,6 +121,7 @@ function rowsToQA(rows, source) {
     alts: idx.alt >= 0 && r[idx.alt] ? String(r[idx.alt]).split(/[|｜\n;；]/).map(s => s.trim()).filter(Boolean) : [],
     category: idx.cat >= 0 ? String(r[idx.cat] || '').trim() : '',
     brand: idx.brand >= 0 ? String(r[idx.brand] || '').trim() : '',
+    kw: idx.kw >= 0 ? splitKw(r[idx.kw]) : [],
     source,
     hits: 0,
   }));
@@ -153,22 +157,41 @@ class QAKnowledge {
   }
   remove(id) { this.save(this.items.filter(x => x.id !== id)); }
 
-  // 返回最优匹配：{ item, score }；brand 为空的条目对所有品牌通用
+  // 单条问答对买家这句话的匹配分（不需要模型）：
+  // 1) 关键词命中 → 0.88~0.98（关键词越长越可信）
+  // 2) 买家的话里完整包含标准问法/相似问法（≥3 个字）→ 0.9
+  // 3) 整句相似度（二元字组 + 同义词归一）
+  score(question, it) {
+    const raw = String(question || '').toLowerCase().replace(PUNCT, '');
+    const nq = normalize(question);
+    let best = { score: 0, via: '' };
+    const take = (score, via) => { if (score > best.score) best = { score, via }; };
+    for (const group of it.kw || []) {
+      const parts = group.toLowerCase().split('+').map(x => x.trim()).filter(Boolean);
+      if (parts.length && parts.every(p => raw.includes(p))) take(Math.min(0.98, 0.88 + 0.01 * parts.join('').length), '关键词：' + group);
+    }
+    for (const p of [it.q, ...(it.alts || [])]) {
+      const np = normalize(p);
+      if (np.length >= 3 && nq.length > np.length && nq.includes(np)) take(0.9, '包含问法：' + p);
+      take(similarity(question, p), p === it.q ? '相似问法' : '相似问法：' + p);
+    }
+    return best;
+  }
+  // 返回最优匹配：{ item, score, via }；brand 为空的条目对所有品牌通用
   match(question, brand = '') {
     let best = null;
     for (const it of this.items) {
       if (it.brand && brand && it.brand !== brand) continue;
-      let s = similarity(question, it.q);
-      for (const alt of it.alts || []) s = Math.max(s, similarity(question, alt));
-      if (!best || s > best.score) best = { item: it, score: s };
+      const r = this.score(question, it);
+      if (!best || r.score > best.score) best = { item: it, score: r.score, via: r.via };
     }
-    return best || { item: null, score: 0 };
+    return best || { item: null, score: 0, via: '' };
   }
   // 前 k 条作为模型参考资料
   topK(question, brand = '', k = 5) {
     return this.items
       .filter(it => !(it.brand && brand && it.brand !== brand))
-      .map(it => ({ item: it, score: Math.max(similarity(question, it.q), ...(it.alts || []).map(a => similarity(question, a))) }))
+      .map(it => ({ item: it, ...this.score(question, it) }))
       .sort((a, b) => b.score - a.score).slice(0, k).filter(x => x.score > 0.1);
   }
   recordHit(id) {
@@ -182,9 +205,9 @@ function mergeQA(oldItems, newItems) {
   for (const n of newItems) {
     const key = normalize(n.q) + '|' + n.brand;
     const old = map.get(key);
-    map.set(key, old ? { ...old, a: n.a, alts: [...new Set([...(old.alts || []), ...n.alts])], category: n.category || old.category, updatedAt: Date.now() } : n);
+    map.set(key, old ? { ...old, a: n.a, alts: [...new Set([...(old.alts || []), ...n.alts])], kw: [...new Set([...(old.kw || []), ...(n.kw || [])])], category: n.category || old.category, updatedAt: Date.now() } : n);
   }
   return [...map.values()];
 }
 
-module.exports = { QAKnowledge, similarity, normalize, readXlsx, readCsv, rowsToQA };
+module.exports = { splitKw, QAKnowledge, similarity, normalize, readXlsx, readCsv, rowsToQA };

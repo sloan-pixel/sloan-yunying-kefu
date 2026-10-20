@@ -292,10 +292,10 @@ H('qaImport', async ({ replace, brand }) => {
 H('qaExport', async () => {
   const r = await dialog.showSaveDialog(win, { defaultPath: 'QA知识库导出.csv' }); if (r.canceled) return null;
   const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['问题', '答案', '相似问法', '分类', '品牌', '命中次数'], ...qa.items.map(x => [x.q, x.a, (x.alts || []).join('|'), x.category, x.brand, x.hits || 0])];
+  const rows = [['问题', '答案', '相似问法', '关键词', '分类', '品牌', '命中次数'], ...qa.items.map(x => [x.q, x.a, (x.alts || []).join('|'), (x.kw || []).join('|'), x.category, x.brand, x.hits || 0])];
   fs.writeFileSync(r.filePath, '﻿' + rows.map(r => r.map(esc).join(',')).join('\n')); shell.showItemInFolder(r.filePath); return r.filePath;
 });
-H('qaTest', ({ text, brand }) => { const m = qa.match(text, brand); return { score: m.score, item: m.item, top: qa.topK(text, brand, 3) }; });
+H('qaTest', ({ text, brand }) => { const m = qa.match(text, brand); return { score: m.score, via: m.via, item: m.item, top: qa.topK(text, brand, 3) }; });
 // 学习
 H('learnState', () => ({ candidates: learner.candidates.filter(c => c.status === 'pending'), readiness: learner.readiness(), style: learner.styleSamples.slice(-10) }));
 H('candApprove', ({ id, edits }) => learner.approve(id, edits));

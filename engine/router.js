@@ -167,7 +167,7 @@ class ReplyEngine extends EventEmitter {
       if (w) { step('命中人工专属类', { category: g.category, word: w }); return { action: 'handoff', category: g.category, reason: `人工专属:${w}` }; }
     }
     const hit = this.qa.match(m.text, m.brand);
-    step('QA 检索', { score: Number(hit.score.toFixed(2)), q: hit.item?.q });
+    step('QA 检索', { score: Number(hit.score.toFixed(2)), q: hit.item?.q, via: hit.via });
     if (hit.item && hit.score >= cfg.qaDirectThreshold) {
       if (mode !== 'human') this.qa.recordHit(hit.item.id);
       return { action: 'reply', reply: hit.item.a, source: 'qa', category: hit.item.category || '售前', confidence: hit.score };

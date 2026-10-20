@@ -151,7 +151,7 @@ async function renderThread() {
 const OUTCOME = { replied: '已回复', transferred: '已转接人工', fallback: '保底话术 + 待办', todo: '已记待办', shadow: '影子草稿（未发送）', skipped: '人工接管中，未回复', error: '出错', deadline: '超时' };
 function traceHtml(t) {
   const steps = (t.steps || []).filter(s => !/^已/.test(s.s)).map(s => {
-    let x = s.s; if (s.score != null) x += ` ${s.score}`; if (s.provider) x += ` · ${s.provider} ${s.ms}ms`; if (s.category) x += ` · ${s.category}`; if (s.err) x += ` · ${s.err.slice(0, 40)}`;
+    let x = s.s; if (s.score != null) x += ` ${s.score}`; if (s.via && s.score >= 0.5) x += `（${s.via}）`; if (s.provider) x += ` · ${s.provider} ${s.ms}ms`; if (s.category) x += ` · ${s.category}`; if (s.err) x += ` · ${s.err.slice(0, 40)}`;
     return `<span class="st">${esc(x)}</span>`;
   }).join('');
   const draft = t.outcome === 'shadow' ? (t.steps.find(s => s.draft)?.draft || '') : '';
@@ -233,8 +233,8 @@ $('#cal-save-transfer').onclick = async () => {
 // ---------------- 知识库 ----------------
 async function renderQA() {
   const items = await K.qaList(); const f = $('#qa-search').value.trim();
-  const list = f ? items.filter(x => (x.q + x.a + (x.alts || []).join('')).includes(f)) : items;
-  $('#qa-body').innerHTML = list.slice(0, 500).map(x => `<tr><td><b style="font-weight:500">${esc(x.q)}</b>${x.alts?.length ? `<div class="alts">${esc(x.alts.join(' | '))}</div>` : ''}</td>
+  const list = f ? items.filter(x => (x.q + x.a + (x.alts || []).join('') + (x.kw || []).join('')).includes(f)) : items;
+  $('#qa-body').innerHTML = list.slice(0, 500).map(x => `<tr><td><b style="font-weight:500">${esc(x.q)}</b>${x.alts?.length ? `<div class="alts">${esc(x.alts.join(' | '))}</div>` : ''}${x.kw?.length ? `<div class="alts">关键词：${esc(x.kw.join(' | '))}</div>` : ''}</td>
     <td class="a">${esc(x.a)}</td><td>${esc(x.category)}</td><td>${esc(x.brand || '通用')}</td><td class="num">${x.hits || 0}</td>
     <td style="white-space:nowrap"><button class="quiet" data-edit="${esc(x.id)}">编辑</button><button class="quiet danger" data-del="${esc(x.id)}">删除</button></td></tr>`).join('')
     || `<tr><td colspan="6" class="empty">知识库是空的。点「导入 Excel」，或从「学习」里确认候选问答。</td></tr>`;
@@ -248,6 +248,7 @@ function qaDialog(x = {}) {
   openDialog(`<h3>${x.id ? '编辑问答' : '新增问答'}</h3>
     <div class="row"><label>问题</label><input name="q" value="${esc(x.q || '')}"></div>
     <div class="row"><label>相似问法（用 | 分隔）</label><input name="alts" value="${esc((x.alts || []).join(' | '))}"></div>
+    <div class="row"><label>关键词（买家的话里出现就命中，用 | 分隔；+ 表示都要出现，如：多久+发 | 发货）</label><input name="kw" value="${esc((x.kw || []).join(' | '))}"></div>
     <div class="row"><label>答案</label><textarea name="a" rows="4">${esc(x.a || '')}</textarea></div>
     <div class="row"><label>分类</label><input name="category" value="${esc(x.category || '')}" placeholder="售前 / 物流 / 售后…"></div>
     <div class="row"><label>品牌（留空 = 通用）</label><input name="brand" value="${esc(x.brand || '')}"></div>
@@ -255,7 +256,7 @@ function qaDialog(x = {}) {
   async (act, f) => {
     if (act !== 'ok') return true;
     if (!f.q.trim() || !f.a.trim()) { toast('问题和答案都要填'); return false; }
-    await K.qaUpsert({ ...x, q: f.q.trim(), a: f.a.trim(), alts: f.alts.split(/[|｜]/).map(s => s.trim()).filter(Boolean), category: f.category.trim(), brand: f.brand.trim() });
+    await K.qaUpsert({ ...x, q: f.q.trim(), a: f.a.trim(), alts: f.alts.split(/[|｜]/).map(s => s.trim()).filter(Boolean), kw: f.kw.split(/[|｜,，]/).map(s => s.trim()).filter(Boolean), category: f.category.trim(), brand: f.brand.trim() });
     renderQA(); return true;
   });
 }
@@ -266,7 +267,7 @@ $('#qa-export').onclick = async () => { const p = await K.qaExport(); if (p) toa
 $('#qa-try-btn').onclick = async () => {
   const v = $('#qa-try').value.trim(); if (!v) return;
   const r = await K.qaTest({ text: v }); const th = st.settings.engine?.qaDirectThreshold ?? st.defaults.qaDirectThreshold;
-  $('#qa-try-out').innerHTML = r.item ? `相似度 <b class="num">${r.score.toFixed(2)}</b>：${esc(r.item.q)} → ${r.score >= th ? '直接回复' : '交给模型参考作答'}` : '没有相近的问答，交给模型';
+  $('#qa-try-out').innerHTML = r.item && r.score > 0 ? `匹配度 <b class="num">${r.score.toFixed(2)}</b>：${esc(r.item.q)}（${esc(r.via || '')}）→ ${r.score >= th ? '<b>直接回复</b>' : '不够确定，交给模型参考作答（没配模型则转人工）'}` : '没有相近的问答：交给模型，没配模型则转人工';
 };
 $('#qa-try').onkeydown = e => e.key === 'Enter' && $('#qa-try-btn').click();
 
