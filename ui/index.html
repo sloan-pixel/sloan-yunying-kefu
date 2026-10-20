@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Sloan云盈客服助手</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<link rel="stylesheet" href="style.css"></head>
+<body class="mode-ai">
+<div id="app">
+  <div id="band">
+    <div class="who" id="who">AI 正在接待</div>
+    <div class="why" id="why"></div>
+    <span class="chip" id="chip-sync">同步未开启</span>
+    <button class="chip" id="chip-model" title="去设置模型">模型未配置</button>
+    <div class="seg" id="mode-seg" role="group" aria-label="接待模式">
+      <button data-m="auto">自动</button><button data-m="ai">AI 托管</button><button data-m="human">人工</button><button data-m="takeover">离线接管</button>
+    </div>
+    <button class="away" id="away-btn" hidden>我离开了</button>
+  </div>
+
+  <aside id="rail">
+    <div class="brand">Sloan云盈客服助手</div>
+    <h3>店铺账号</h3>
+    <div id="stores"></div>
+    <button class="add" id="add-store">添加店铺</button>
+  </aside>
+
+  <nav id="tabs">
+    <button data-t="inbox" class="on">收件箱</button>
+    <button data-t="backoffice">店铺后台</button>
+    <button data-t="qa">知识库</button>
+    <button data-t="learn">学习</button>
+    <button data-t="todos">待办<span class="count" id="todo-count" hidden></span></button>
+    <button data-t="monitor">时效监控</button>
+    <button data-t="settings">设置</button>
+  </nav>
+
+  <main>
+    <div class="page flush on" id="p-inbox">
+      <div id="inbox">
+        <div id="convs"></div>
+        <div id="thread"><div class="empty">各店铺的买家消息会汇总到这里。<br>先在左侧添加店铺，到「店铺后台」登录并校准。</div></div>
+      </div>
+    </div>
+
+    <div class="page flush" id="p-backoffice">
+      <div id="backoffice">
+        <div id="bo-bar">
+          <b id="bo-name">未选择店铺</b><span id="bo-health" class="warn"></span>
+          <span class="spacer"></span>
+          <button id="bo-back" title="网页后退一步">后退</button>
+          <button id="bo-login">打开登录页</button>
+          <button id="bo-reload">回到客服工作台</button>
+          <button id="bo-hide" title="把网页收起来，不影响登录和接收消息">收起网页</button>
+          <button id="bo-calib">校准</button>
+          <button id="bo-edit">店铺设置</button>
+        </div>
+        <div id="calib">
+          <div class="toolbar"><b>校准：告诉软件页面上每个东西在哪</b><span class="spacer"></span><button id="cal-cancel" class="danger" hidden>取消点选</button><button id="cal-close" class="quiet">收起</button></div><div class="toolbar"><span class="lead" style="margin:0">点「点选」，再到下面的页面里点对应的位置。平台改版后重新点一次即可。</span></div>
+          <div class="cal-grid" id="cal-grid"></div>
+          <div class="toolbar" style="margin-top:10px"><span>转接步骤（JSON，{target} 会替换成人工子账号）</span></div>
+          <textarea id="cal-transfer" style="width:100%;height:70px;font-size:12px"></textarea>
+          <div class="toolbar" style="margin-top:6px"><button id="cal-save-transfer">保存转接步骤</button><span class="lead" style="margin:0">示例：[{"click":"转接按钮"},{"type":"搜索框","text":"{target}"},{"clickText":"客服列表项","text":"{target}"},{"click":"确认按钮"}]</span></div>
+        </div>
+        <div id="viewport"><div class="ph">在左侧选择一个店铺</div></div>
+      </div>
+    </div>
+
+    <div class="page" id="p-qa">
+      <h2>QA 知识库</h2>
+      <p class="lead">AI 先按这里的问答回复。Excel 第一行写表头：问题、答案、相似问法（用 | 分隔）、分类、品牌。品牌留空表示所有店铺通用。</p>
+      <div class="toolbar">
+        <button class="primary" id="qa-import">导入 Excel</button>
+        <button id="qa-add">新增一条</button>
+        <button id="qa-export">导出</button>
+        <span class="spacer"></span>
+        <input id="qa-search" placeholder="搜索问题或答案" style="width:220px">
+      </div>
+      <div class="toolbar"><input id="qa-try" placeholder="试一句买家的话，看会命中哪条" style="flex:1;max-width:520px"><button id="qa-try-btn">试试</button><span id="qa-try-out"></span></div>
+      <table><thead><tr><th>问题 / 相似问法</th><th>答案</th><th>分类</th><th>品牌</th><th class="num">命中</th><th></th></tr></thead><tbody id="qa-body"></tbody></table>
+    </div>
+
+    <div class="page" id="p-learn">
+      <h2>学习</h2>
+      <p class="lead">人工接待时，AI 在后台对每条消息拟一个回复，再和人工的实际回复对比。人工的回答会被整理成候选问答，确认后才进入知识库。</p>
+      <h3 style="font-size:15px">各类问题的吻合率</h3>
+      <table style="max-width:760px;margin-bottom:20px"><thead><tr><th>分类</th><th class="num">样本</th><th class="num">吻合</th><th>吻合率</th><th>建议</th></tr></thead><tbody id="ready-body"></tbody></table>
+      <h3 style="font-size:15px">待确认的候选问答</h3>
+      <table><thead><tr><th>买家问法</th><th>人工答法（可修改）</th><th class="num">出现</th><th></th></tr></thead><tbody id="cand-body"></tbody></table>
+    </div>
+
+    <div class="page" id="p-todos">
+      <h2>待办</h2>
+      <p class="lead">离线接管期间 AI 处理不了、或转接失败的会话都记在这里，人工上线后逐条处理。</p>
+      <div class="toolbar"><label><input type="checkbox" id="todo-showdone"> 显示已处理</label></div>
+      <table><thead><tr><th>时间</th><th>店铺</th><th>买家</th><th>内容</th><th>分类 / 原因</th><th></th></tr></thead><tbody id="todo-body"></tbody></table>
+    </div>
+
+    <div class="page" id="p-monitor">
+      <h2>时效监控</h2>
+      <p class="lead">从页面出现买家消息，到回复、转接或保底话术发出的耗时。目标 20 秒内，极限 30 秒。</p>
+      <div class="toolbar"><select id="mon-range"><option value="3600000">最近 1 小时</option><option value="86400000" selected>最近 24 小时</option><option value="604800000">最近 7 天</option></select></div>
+      <div class="stats" id="mon-stats"></div>
+      <h3 style="font-size:15px">最近的决策</h3>
+      <table><thead><tr><th>时间</th><th>买家</th><th>内容</th><th>结果</th><th class="num">耗时</th><th>过程</th></tr></thead><tbody id="mon-body"></tbody></table>
+    </div>
+
+    <div class="page" id="p-settings">
+      <h2>设置</h2>
+      <section class="block"><h3>本机席位</h3>
+        <div class="form">
+          <label>席位名称</label><input id="s-seat-name">
+          <label>席位类型</label><select id="s-seat-role"><option value="ai">AI 席位（登录各店 AI 客服账号）</option><option value="human">人工席位（登录各店人工子账号）</option></select>
+          <label>人工离线自动接管</label><label style="color:inherit"><input type="checkbox" id="s-auto-takeover"> 开启</label>
+          <div class="hint">AI 席位：同步服务里看不到在线的人工席位时，不再转接，改为保底话术 + 待办。人工席位：电脑无操作或点了「我离开了」，本机自动切到 AI 接管。</div>
+          <label>无操作多久算离开</label><div><input id="s-idle" type="number" min="1" style="width:80px"> 分钟</div>
+        </div>
+      </section>
+      <section class="block"><h3>模型</h3>
+        <p class="lead">支持通义千问、DeepSeek、智谱、Kimi、豆包、OpenAI、Claude、本地模型（Ollama，免费、不用 Key）和任何 OpenAI 兼容接口。按从上到下的顺序使用，前一个超时或失败自动换下一个。一个都不启用也能用：知识库能答的照常自动回复，其余转人工或发保底话术。</p>
+        <div id="s-models"></div>
+        <div class="form" style="margin-top:12px">
+          <label>店铺通用信息</label><textarea id="s-shopinfo" rows="3" placeholder="品牌、发货地、发货时效、售后政策等，模型回答时会参考"></textarea>
+        </div>
+      </section>
+      <section class="block"><h3>双机同步</h3>
+        <div class="form">
+          <label>同步服务地址</label><input id="s-sync-url" placeholder="例如 http://192.168.1.20:8787">
+          <div class="hint">两台电脑填同一个地址，用来共享知识库、待办和在线状态。留空则只在本机运行。</div>
+          <label>同步密码</label><input id="s-sync-token" type="password">
+          <label>多久没心跳算离线</label><div><input id="s-sync-off" type="number" min="10" style="width:80px"> 秒</div>
+        </div>
+      </section>
+      <section class="block"><h3>回复规则</h3>
+        <div class="form">
+          <label>QA 直接回复阈值</label><input id="s-qa-th" type="number" step="0.01" min="0.3" max="1">
+          <div class="hint">买家的话与知识库问法的相似度达到这个值，直接用知识库答案；低于它交给模型参考作答。</div>
+          <label>模型最低置信度</label><input id="s-model-th" type="number" step="0.05" min="0" max="1">
+          <label>保底时限（毫秒）</label><input id="s-deadline" type="number" step="1000" min="5000">
+          <label>转接提示语</label><input id="s-handoff">
+          <label>先发安抚语（毫秒）</label><input id="s-holding-ms" type="number" step="1000" min="0"><div class="hint">0 表示不发。超过这个时长还没出结果，先回一句安抚语。</div>
+          <label>平台自动回复关键词</label><input id="s-ignore" placeholder="例如：欢迎光临，感谢您的咨询">
+          <div class="hint">平台自己发的欢迎语、自动回复里的关键词，用逗号分隔。含这些词的卖家消息不会被当成人工插话。</div>
+        </div>
+        <h3 style="font-size:14px">必须人工处理的问题</h3>
+        <p class="lead">命中关键词时：AI 托管 → 转接人工；离线接管 → 发对应保底话术并记待办。</p>
+        <div id="s-humanonly"></div>
+        <div class="toolbar" style="margin-top:12px"><button class="primary" id="s-save">保存设置</button></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<dialog id="dlg"></dialog>
+<div id="toast" role="status"></div>
+<script src="dev-shim.js"></script>
+<script src="app.js"></script>
+</body></html>

@@ -1,0 +1,78 @@
+{
+  "name": "kefu-hub",
+  "productName": "Sloan云盈客服助手",
+  "version": "1.0.0",
+  "description": "Sloan云盈客服助手：多平台多店铺客服整合 IM，内嵌商家后台、任意模型 AI 自动应答、影子学习、平台转接、人工离线接管",
+  "main": "main.js",
+  "author": "Little A",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "sync": "node sync/server.js",
+    "test": "node test/engine.test.js && node test/llm.test.js && node test/qa.test.js && node test/sync.test.js",
+    "test:browser": "node test/adapter.test.js && node test/e2e.test.js && node test/load.test.js",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist": "electron-builder --mac --win"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "electron": "~44.9.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ai.littlea.yunying",
+    "productName": "Sloan云盈客服助手",
+    "artifactName": "Sloan云盈客服助手-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload-*.js",
+      "engine/**",
+      "adapters/**",
+      "ui/**",
+      "mock/**",
+      "sync/server.js",
+      "samples/**",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.business",
+      "identity": null,
+      "icon": "build/icon.png"
+    },
+    "dmg": {
+      "title": "Sloan云盈客服助手"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "icon": "build/icon.png"
+    },
+    "electronDownload": {
+      "mirror": "https://npmmirror.com/mirrors/electron/"
+    }
+  }
+}

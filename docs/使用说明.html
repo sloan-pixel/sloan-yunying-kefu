@@ -1,0 +1,268 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sloan云盈客服助手 使用说明</title><style>body{font:15px/1.7 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#1b2430;max-width:860px;margin:32px auto;padding:0 20px}h1{font-size:26px}h2{font-size:19px;margin-top:32px;border-bottom:1px solid #dfe4ea;padding-bottom:4px}table{border-collapse:collapse;width:100%;margin:10px 0}th,td{border:1px solid #dfe4ea;padding:6px 10px;text-align:left;vertical-align:top}th{background:#f6f8fa}code{background:#f0f2f5;padding:1px 5px;border-radius:3px}</style></head><body><h1>Sloan云盈客服助手 使用说明</h1>
+<p>Sloan云盈客服助手把拼多多、天猫、抖店、京东、有赞等店铺的商家客服网页放进一个桌面软件里：买家消息汇总到一处，AI 按知识库和大模型自动回复，答不了的用平台自带转接交给人工子账号，目标是每条消息 20 秒内有回应。</p>
+<h2>安装与启动</h2>
+<ul>
+<li><strong>Mac</strong>：双击 <code>.dmg</code>，把图标拖进「应用程序」。第一次打开时在「应用程序」里<strong>右键点软件 → 打开 → 打开</strong>。提示「已损坏」时，在「终端」执行 <code>xattr -cr &quot;/Applications/Sloan云盈客服助手.app&quot;</code>。</li>
+<li><strong>Windows</strong>：解压 <code>.zip</code>，双击 <code>Sloan云盈客服助手.exe</code>。出现「Windows 已保护你的电脑」时点「更多信息 → 仍要运行」。</li>
+<li><strong>关闭</strong>：Mac 按 Cmd+Q，Windows 直接关窗口。店铺、登录状态、知识库都会自动保存，下次打开不用重新登录。</li>
+</ul>
+<p>想先熟悉操作，左侧自带「模拟店铺(测试)」：在「店铺后台」底部黄色栏选一个买家、输入一句话、点「买家发送」，再到「收件箱」看 AI 怎么处理。它不连任何真实平台。</p>
+<h2>界面导览</h2>
+<p>顶部色带的颜色表示现在谁在回复：青色 = AI 托管，蓝紫色 = 人工，橙色 = 离线接管。</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>做什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>顶部色带</td>
+<td>当前模式和原因；同步、模型状态（点模型状态可直接去设置）；右侧「自动 / AI 托管 / 人工 / 离线接管」切换；人工席位还有「我离开了」</td>
+</tr>
+<tr>
+<td>左侧栏</td>
+<td>店铺账号列表。圆点：绿 = 已连接，橙 = 未登录或未校准，灰 = 未打开。底部「添加店铺」</td>
+</tr>
+<tr>
+<td>收件箱</td>
+<td>所有店铺的买家会话汇总；每条 AI 回复下有决策过程和耗时</td>
+</tr>
+<tr>
+<td>店铺后台</td>
+<td>内嵌的平台网页（登录、看原始聊天页、校准）</td>
+</tr>
+<tr>
+<td>知识库</td>
+<td>QA 问答，支持 Excel 导入、导出、试答</td>
+</tr>
+<tr>
+<td>学习</td>
+<td>AI 从人工回复里整理的候选问答，以及各类问题的吻合率</td>
+</tr>
+<tr>
+<td>待办</td>
+<td>AI 处理不了、需要人工补上的会话</td>
+</tr>
+<tr>
+<td>时效监控</td>
+<td>每条消息从进线到回复的耗时统计</td>
+</tr>
+<tr>
+<td>设置</td>
+<td>席位、模型、双机同步、回复规则</td>
+</tr>
+</tbody></table>
+<p>任何弹窗都能用右上角 ✕、Esc 或点弹窗外面关闭。</p>
+<h2>三种模式</h2>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>AI 做什么</th>
+<th>答不了时</th>
+<th>适合</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AI 托管</td>
+<td>知识库命中直接回，没命中交给模型作答</td>
+<td>发转接提示，用平台自带转接交给人工子账号</td>
+<td>日常接待</td>
+</tr>
+<tr>
+<td>人工</td>
+<td>不发消息，只在后台拟草稿，和人工的实际回复对比学习</td>
+<td>—</td>
+<td>上线初期、大促、想让 AI 多学</td>
+</tr>
+<tr>
+<td>离线接管</td>
+<td>常规问题照常自动回复</td>
+<td>不转接，按分类发保底话术，记入待办</td>
+<td>夜间、人员离岗</td>
+</tr>
+</tbody></table>
+<p>右上角选「自动」时：</p>
+<ul>
+<li>AI 席位：同步服务里有在线的人工席位 → AI 托管；没有 → 离线接管。没开同步时一直是 AI 托管。</li>
+<li>人工席位：人在 → 人工；电脑无操作超过设定分钟数（默认 5 分钟），或点了「我离开了」→ 离线接管。</li>
+</ul>
+<h2>接入店铺</h2>
+<ol>
+<li><strong>添加</strong>：左下角「添加店铺」，选平台、填店铺名称。「转接给哪个人工子账号」填平台转接列表里显示的名字。</li>
+<li><strong>登录</strong>：「店铺后台」→「打开登录页」，扫码或输入账号密码。不想现在登录可以点「收起网页」或切到其他标签页。</li>
+<li><strong>打开聊天页</strong>：点「回到客服工作台」，确认看到的是买家聊天页面。点错了可以点「后退」。</li>
+<li><strong>校准</strong>：点「校准」，逐项点「点选」，再到下面的网页里点对应位置：会话列表里的一个会话、未读红点、买家名字、当前聊天的买家名、一条消息（整行）、买家消息、我方消息、文字气泡、输入框、发送按钮。点错了按 Esc 或「取消点选」。</li>
+<li><strong>转接步骤</strong>：按平台实际操作顺序填写，例如「点转接按钮 → 在搜索框输入 {target} → 点列表里这个人 → 点确认」，点「保存转接步骤」。{target} 会自动替换成第 1 步填的人工子账号。</li>
+<li><strong>确认连接</strong>：左侧圆点变绿，店铺后台顶部显示「已连接 · 识别到 N 条消息」。</li>
+</ol>
+<p>建议先用「人工」模式观察一天，确认消息识别准确，再切到 AI 托管。</p>
+<h2>一条消息怎么处理</h2>
+<ol>
+<li>买家 1.2 秒内连发的几条合并成一条。</li>
+<li>命中订单 / 物流 / 售后 / 投诉关键词 → 直接按“答不了”处理。</li>
+<li>知识库相似度 ≥ 0.72 → 直接用知识库答案回复（约 2 秒）。</li>
+<li>否则交给模型作答，置信度 ≥ 0.6 → 发送模型回复（约 5 秒）。</li>
+<li>答不了：AI 托管 → 发转接提示并转人工子账号；离线接管 → 发分类保底话术并记待办。</li>
+<li>任何一步超过 18 秒还没答复，自动发保底话术。人工模式下流程照走，但只生成草稿、不发送。</li>
+</ol>
+<h2>收件箱</h2>
+<ul>
+<li><strong>看决策过程</strong>：每条买家消息下方显示 AI 的处理步骤和总耗时，超过 20 秒显示为红色。</li>
+<li><strong>直接回复</strong>：在底部输入框打字发送，消息通过店铺网页发出，该会话自动转为人工接管。</li>
+<li><strong>接管 / 交回</strong>：「我来接管」让 AI 不再回这个买家；「交回 AI」恢复。在平台网页里直接打字回复，效果相同。</li>
+<li><strong>改写回答</strong>：点「改写成更好的回答」，可以顺便发给买家。改写内容进入「学习」等你确认。</li>
+</ul>
+<h2>知识库与学习</h2>
+<p><strong>导入 Excel</strong>：「知识库 → 导入 Excel」。第一行写表头：</p>
+<table>
+<thead>
+<tr>
+<th>表头</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>问题</td>
+<td>是</td>
+<td>标准问法</td>
+</tr>
+<tr>
+<td>答案</td>
+<td>是</td>
+<td>AI 直接发出的话</td>
+</tr>
+<tr>
+<td>相似问法</td>
+<td>否</td>
+<td>多个用 | 分隔</td>
+</tr>
+<tr>
+<td>分类</td>
+<td>否</td>
+<td>售前 / 物流 / 售后等</td>
+</tr>
+<tr>
+<td>品牌</td>
+<td>否</td>
+<td>留空 = 所有店铺通用</td>
+</tr>
+</tbody></table>
+<p><strong>试答</strong>：在「试一句买家的话」里输入，看会命中哪条、相似度多少。</p>
+<p><strong>学习</strong>：人工模式下，AI 把人工的回答整理成候选问答，手机号和地址会被替换掉。样本满 20 条且吻合率达到 90% 时提示「可以交给 AI 托管」。候选问答<strong>必须点「加入知识库」才生效</strong>；标黄的含单号、补偿等一次性内容，确认前请改成通用说法。</p>
+<h2>待办与时效监控</h2>
+<p><strong>待办</strong>：离线接管期间 AI 处理不了的会话、转接失败的会话都记在这里，处理完点「标记已处理」。</p>
+<p><strong>时效监控</strong>：重点看「20 秒内完成」（目标 98% 以上）、「超过 30 秒」（应该是 0）、「90% 在几秒内」。</p>
+<h2>设置</h2>
+<p>改完记得点底部「保存设置」。</p>
+<p><strong>模型</strong>：任意模型都能驱动，可以配多个，从上到下按顺序使用，前一个失败自动换下一个。<strong>一个都不启用也能用</strong>：知识库能答的照常自动回复，其余转人工或发保底话术。</p>
+<ol>
+<li>点「添加模型」或在已有卡片上选平台。</li>
+<li>点「获取 Key」去对应平台申请 API Key，填进去。本地模型（Ollama）不用 Key。</li>
+<li>点「获取型号」查当前能用的型号，在「型号名」里选一个。</li>
+<li>勾选「启用」，点「测试」，看到「连接成功」和试答内容即可。</li>
+<li>用 ↑ ↓ 调整优先顺序。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>平台</th>
+<th>默认型号</th>
+<th>要 Key</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>通义千问（阿里云百炼）</td>
+<td>qwen-plus</td>
+<td>是</td>
+</tr>
+<tr>
+<td>DeepSeek</td>
+<td>deepseek-flash</td>
+<td>是</td>
+</tr>
+<tr>
+<td>智谱 GLM</td>
+<td>glm-4.7-flash（免费档）</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Kimi（月之暗面）</td>
+<td>kimi-k2.6</td>
+<td>是</td>
+</tr>
+<tr>
+<td>豆包（火山方舟）</td>
+<td>doubao-seed-1-8-251228</td>
+<td>是</td>
+</tr>
+<tr>
+<td>OpenAI</td>
+<td>gpt-4.1-mini</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Claude</td>
+<td>claude-haiku-5-5</td>
+<td>是</td>
+</tr>
+<tr>
+<td>本地模型（Ollama）</td>
+<td>qwen3:8b</td>
+<td>否</td>
+</tr>
+<tr>
+<td>自定义</td>
+<td>任何 OpenAI 兼容接口，自填地址和型号</td>
+<td>视接口</td>
+</tr>
+</tbody></table>
+<p>「店铺通用信息」填品牌、发货地、发货时效、售后政策，模型作答时会参考。</p>
+<p><strong>本机席位</strong>：AI 电脑选「AI 席位」，人工电脑选「人工席位」。</p>
+<p><strong>双机同步</strong>：在其中一台电脑运行同步服务并设密码；两台都填 <code>http://那台电脑的局域网IP:8787</code> 和同一个密码。</p>
+<p><strong>回复规则</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>默认</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>QA 直接回复阈值</td>
+<td>0.72</td>
+<td>相似度达到就直接用知识库答案</td>
+</tr>
+<tr>
+<td>模型最低置信度</td>
+<td>0.6</td>
+<td>低于就视为答不了</td>
+</tr>
+<tr>
+<td>保底时限</td>
+<td>18000 毫秒</td>
+<td>到点还没答复就发保底话术，最多 28 秒</td>
+</tr>
+<tr>
+<td>先发安抚语</td>
+<td>0（关）</td>
+<td>超过该时长先回一句「正在为您查询」</td>
+</tr>
+<tr>
+<td>必须人工处理的问题</td>
+<td>投诉、售后、订单、物流</td>
+<td>每类可改关键词和保底话术</td>
+</tr>
+</tbody></table>
+<h2>常见问题</h2>
+<p><strong>打不开 / 提示无法验证开发者</strong>：见上方「安装与启动」。</p>
+<p><strong>界面点不动</strong>：按 Esc 关掉弹窗；在店铺后台可点「收起网页」。仍不行就退出重开，数据不会丢。</p>
+<p><strong>圆点一直是橙色</strong>：登录已过期，或还没校准。</p>
+<p><strong>AI 不回复某个买家</strong>：该会话可能已被人工接管（收件箱里带「人工」标签），点「交回 AI」。或者当前是「人工」模式。</p>
+<p><strong>模型测试失败</strong>：401/403 = Key 不对；404 = 接口地址或型号名不对，点「获取型号」；429 = 额度用完。</p>
+<p><strong>转接失败</strong>：检查人工子账号名字是否和平台列表一致、人工子账号是否在线；失败的会话会进待办。</p>
+<p>注意：自动化操作商家后台有平台风控风险，先用一家店、小流量验证。</p>
+</body></html>

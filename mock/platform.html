@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>模拟商家客服工作台</title>
+<style>
+  *{box-sizing:border-box} body{margin:0;font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f3f4f6;color:#222;height:100vh;display:flex;flex-direction:column}
+  header{background:#e02e24;color:#fff;padding:8px 14px;font-weight:600}
+  main{flex:1;display:flex;min-height:0}
+  #convs{width:230px;background:#fff;border-right:1px solid #e5e5e5;overflow:auto}
+  .conv-item{padding:10px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+  .conv-item.active{background:#fff1f0}
+  .badge{background:#e02e24;color:#fff;border-radius:9px;font-size:11px;padding:0 6px}
+  #chat{flex:1;display:flex;flex-direction:column;min-width:0}
+  #chat-title{padding:10px 14px;background:#fff;border-bottom:1px solid #eee;font-weight:600}
+  #msg-list{flex:1;overflow:auto;padding:14px}
+  .msg{display:flex;margin:8px 0} .msg.seller{justify-content:flex-end} .msg.system{justify-content:center;color:#999;font-size:12px}
+  .bubble{max-width:60%;padding:8px 12px;border-radius:10px;background:#fff;box-shadow:0 1px 1px rgba(0,0,0,.05)} .seller .bubble{background:#ffe7e3}
+  #editor{background:#fff;border-top:1px solid #eee;padding:8px;display:flex;gap:8px}
+  #reply-input{flex:1;height:60px;resize:none;border:1px solid #ddd;border-radius:6px;padding:6px}
+  button{border:0;border-radius:6px;padding:6px 14px;background:#e02e24;color:#fff;cursor:pointer} button.ghost{background:#eee;color:#333}
+  #sim{background:#fffbe6;border-top:1px dashed #e0c36b;padding:8px;display:flex;gap:6px;align-items:center;font-size:12px}
+  #sim input{flex:1;padding:5px;border:1px solid #ddd;border-radius:4px}
+  #transfer-dlg{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center}
+  #transfer-dlg .panel{background:#fff;border-radius:8px;padding:16px;width:300px}
+  .agent-item{padding:6px;border:1px solid #eee;border-radius:4px;margin:4px 0;cursor:pointer} .agent-item.sel{border-color:#e02e24;background:#fff1f0}
+</style></head>
+<body>
+<header>模拟商家客服工作台（测试用，不连任何真实平台）　当前账号：<span id="me">AI客服账号</span></header>
+<main>
+  <div id="convs"></div>
+  <div id="chat">
+    <div id="chat-title">请选择会话</div>
+    <div id="msg-list"></div>
+    <div id="editor"><textarea id="reply-input" placeholder="输入回复，回车发送"></textarea>
+      <div style="display:flex;flex-direction:column;gap:6px"><button id="send-btn">发送</button><button id="transfer-btn" class="ghost">转接</button></div></div>
+    <div id="sim">🧪 模拟买家：<select id="sim-buyer"></select><input id="sim-text" placeholder="买家说的话，例如：这个有几个颜色"><button id="sim-send">买家发送</button></div>
+  </div>
+</main>
+<div id="transfer-dlg"><div class="panel"><b>转接给其他客服</b>
+  <input id="transfer-search" placeholder="搜索客服账号" style="width:100%;margin:8px 0;padding:5px">
+  <div id="agents"></div>
+  <div style="text-align:right;margin-top:8px"><button class="ghost" id="transfer-cancel">取消</button> <button id="transfer-confirm">确认转接</button></div>
+</div></div>
+<script>
+// 模拟一个“受控输入框”的前端框架：只有收到 input 事件，内部状态才会更新
+const state = { draft: '', current: null, convs: { '买家小林': [], '买家阿珍': [], '买家Tom': [] }, unread: {}, agents: ['人工客服-小美', '人工客服-阿强', '客服主管'], pick: null, transfers: [] };
+const $ = s => document.querySelector(s);
+function renderConvs() {
+  $('#convs').innerHTML = Object.keys(state.convs).map(n => `<div class="conv-item ${n === state.current ? 'active' : ''}" data-n="${n}"><span class="conv-name">${n}</span>${state.unread[n] ? `<span class="badge">${state.unread[n]}</span>` : ''}</div>`).join('');
+  $('#sim-buyer').innerHTML = Object.keys(state.convs).map(n => `<option ${n === $('#sim-buyer').value ? 'selected' : ''}>${n}</option>`).join('');
+}
+function renderMsgs() {
+  $('#chat-title').textContent = state.current || '请选择会话';
+  // 每次重新生成 DOM（模拟虚拟列表重渲染）
+  $('#msg-list').innerHTML = (state.convs[state.current] || []).map(m => `<div class="msg ${m.from}" data-id="${m.id}"><div class="bubble">${m.text}</div></div>`).join('');
+  $('#msg-list').scrollTop = 1e9;
+}
+let seq = 0;
+function push(conv, from, text) {
+  state.convs[conv].push({ id: 'm' + (++seq), from, text, ts: Date.now() });
+  if (from === 'buyer' && conv !== state.current) state.unread[conv] = (state.unread[conv] || 0) + 1;
+  renderConvs(); if (conv === state.current) renderMsgs();
+}
+document.addEventListener('click', e => {
+  const it = e.target.closest('.conv-item');
+  if (it) { state.current = it.dataset.n; state.unread[state.current] = 0; setTimeout(() => { renderConvs(); renderMsgs(); }, 120); $('#chat-title').textContent = state.current; }
+});
+$('#reply-input').addEventListener('input', e => { state.draft = e.target.value; });
+function doSend() { const t = state.draft.trim(); if (!t || !state.current) return; push(state.current, 'seller', t); state.draft = ''; $('#reply-input').value = ''; }
+$('#send-btn').onclick = doSend;
+$('#reply-input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); } });
+$('#sim-send').onclick = () => { const t = $('#sim-text').value.trim(); if (t) { push($('#sim-buyer').value, 'buyer', t); $('#sim-text').value = ''; } };
+$('#sim-text').addEventListener('keydown', e => { if (e.key === 'Enter') $('#sim-send').click(); });
+function renderAgents() { const f = $('#transfer-search').value; $('#agents').innerHTML = state.agents.filter(a => a.includes(f)).map(a => `<div class="agent-item ${a === state.pick ? 'sel' : ''}">${a}</div>`).join(''); }
+$('#transfer-btn').onclick = () => { if (!state.current) return; state.pick = null; $('#transfer-search').value = ''; renderAgents(); $('#transfer-dlg').style.display = 'flex'; };
+$('#transfer-search').addEventListener('input', renderAgents);
+$('#agents').addEventListener('click', e => { const a = e.target.closest('.agent-item'); if (a) { state.pick = a.textContent; renderAgents(); } });
+$('#transfer-cancel').onclick = () => { $('#transfer-dlg').style.display = 'none'; };
+$('#transfer-confirm').onclick = () => { if (!state.pick) return; state.transfers.push({ conv: state.current, to: state.pick }); push(state.current, 'system', `会话已转接给 ${state.pick}`); $('#transfer-dlg').style.display = 'none'; };
+window.__mock = { state, push };
+renderConvs(); renderMsgs();
+// 预置一段历史，验证“历史消息不会被重复回复”
+push('买家阿珍', 'buyer', '之前问过的问题'); push('买家阿珍', 'seller', '好的亲'); state.unread['买家阿珍'] = 0; renderConvs();
+</script>
+</body></html>

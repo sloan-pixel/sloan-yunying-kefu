@@ -1,0 +1,8 @@
+node_modules/
+dist/
+sync/sync-data.json
+*.log
+安装日志.txt
+打包日志.txt
+*.tgz
+.DS_Store

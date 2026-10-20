@@ -1,0 +1,75 @@
+{
+  "_说明": "每个平台一组配置。url 是商家客服网页入口；selectors 需在软件里用「校准」点选生成（平台改版后重新校准即可）。kind=web 走内嵌网页，kind=api 走官方接口（预留）。",
+  "pinduoduo": {
+    "name": "拼多多",
+    "kind": "web",
+    "loginUrl": "https://mms.pinduoduo.com/login/",
+    "url": "https://mms.pinduoduo.com/chat-merchant/index.html",
+    "note": "拼多多商家后台 → 多多客服 网页版工作台",
+    "selectors": {}
+  },
+  "tmall": {
+    "name": "天猫/淘宝",
+    "kind": "web",
+    "loginUrl": "https://myseller.taobao.com/",
+    "url": "https://myseller.taobao.com/",
+    "note": "千牛网页版。若你的账号只能用千牛客户端接待，需改用千牛客户端窗口模式（第二阶段），请先登录确认是否有网页接待入口",
+    "selectors": {}
+  },
+  "douyin": {
+    "name": "抖店(飞鸽)",
+    "kind": "web",
+    "loginUrl": "https://fxg.jinritemai.com/login",
+    "url": "https://im.jinritemai.com/pc_seller_v2/main/workspace",
+    "note": "抖店 → 飞鸽客服 网页版工作台",
+    "selectors": {}
+  },
+  "jd": {
+    "name": "京东(京麦/咚咚)",
+    "kind": "web",
+    "loginUrl": "https://shop.jd.com/",
+    "url": "https://shop.jd.com/",
+    "note": "京东商家后台；咚咚接待入口以你账号实际看到的网页地址为准，可在店铺设置里改",
+    "selectors": {}
+  },
+  "youzan": {
+    "name": "有赞",
+    "kind": "web",
+    "loginUrl": "https://account.youzan.com/login",
+    "url": "https://www.youzan.com/",
+    "note": "有赞后台客服；有赞云开放接口可做成 API 模式（预留）",
+    "selectors": {}
+  },
+  "wechat": {
+    "name": "微信/企业微信",
+    "kind": "api",
+    "url": "",
+    "note": "个人微信无官方接口，不建议自动化；企业微信/微信客服有官方接口，作为 API 适配器接入（预留）",
+    "selectors": {}
+  },
+  "mock": {
+    "name": "模拟平台(测试)",
+    "kind": "web",
+    "url": "mock://platform",
+    "note": "内置的模拟客服页，用来不碰真实店铺就测试整条链路",
+    "selectors": {
+      "convList": ".conv-item",
+      "convUnread": ".badge",
+      "convName": ".conv-name",
+      "currentName": "#chat-title",
+      "msgItem": "#msg-list .msg",
+      "msgBuyer": ".msg.buyer",
+      "msgSeller": ".msg.seller",
+      "msgSystem": ".msg.system",
+      "msgText": ".bubble",
+      "input": "#reply-input",
+      "sendBtn": "#send-btn",
+      "transferSteps": [
+        { "click": "#transfer-btn" },
+        { "type": "#transfer-search", "text": "{target}" },
+        { "clickText": ".agent-item", "text": "{target}" },
+        { "click": "#transfer-confirm" }
+      ]
+    }
+  }
+}
